@@ -145,6 +145,7 @@ class Config:
             'list_font_size': '10',
             'list_hide_time': '0',
             'list_hide_tags': '0',
+            'underline_urls': 'true',
             'layout': 'horizontal',
             'print_columns': '0',
             'text_color': 'black',
@@ -213,6 +214,8 @@ class Config:
 
         self.list_hide_time = cp.getint(cfg_sec, 'list_hide_time')
         self.list_hide_tags = cp.getint(cfg_sec, 'list_hide_tags')
+
+        self.underline_urls = cp.getboolean(cfg_sec, 'underline_urls')
 
         self.layout = cp.get(cfg_sec, 'layout')
         self.print_columns = cp.getint(cfg_sec, 'print_columns')
