@@ -1583,6 +1583,11 @@ class View(utils.SubjectMixin):
         self.text_note.tag_config('md-bold', font=bold_font)
         self.fonts.append(bold_font)
 
+        title_font = tkFont.Font(self.text_note, self.text_note.cget("font"))
+        title_font.configure(weight="bold", size=2 * self.config.font_size)
+        self.text_note.tag_config("md-title", font=title_font)
+        self.fonts.append(title_font)
+
         # finish UI creation ###########################################
 
         # set the window to the same place that it was last time
@@ -1885,12 +1890,13 @@ class View(utils.SubjectMixin):
         # we have multiple tags with the same name, e.g. md-bold
         # this will remove all of them.
         t.tag_remove('md-bold', '1.0', 'end')
+        t.tag_remove('md-title', '1.0', 'end')
 
         # first just use our standard regular expression for finding the first
         # non whitespace line, wherever it is:
         mo = utils.note_title_re.match(content)
         if mo:
-            t.tag_add('md-bold', '1.0+{0}c'.format(mo.start()), '1.0+{0}c'.format(mo.end()))
+            t.tag_add('md-title', '1.0+{0}c'.format(mo.start()), '1.0+{0}c'.format(mo.end()))
 
         # then do headings
         pat = re.compile(r"^#.*$", re.MULTILINE)
