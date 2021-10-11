@@ -470,7 +470,7 @@ class NotesList(tk.Frame):
         # http://stackoverflow.com/a/9901862/532513
         bold_font = tkFont.Font(self.text, self.text.cget("font"))
         bold_font.configure(weight="bold")
-        self.text.tag_config("title", font=bold_font)
+        self.text.tag_config("title", font=bold_font, lmargin1=3)
 
         italic_font = tkFont.Font(self.text, self.text.cget("font"))
         italic_font.configure(slant="italic")
