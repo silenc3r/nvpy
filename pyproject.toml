@@ -1,0 +1,28 @@
+[tool.poetry]
+name = "nvpy"
+version = "2.1.0"
+description = "A cross-platform simplenote-syncing note-taking app inspired by Notational Velocity."
+authors = ["Charl P. Botha"]
+license = "BSD"
+
+[tool.poetry.dependencies]
+python = "^3.6"
+Markdown = "*"
+docutils = "*"
+simplenote = "^2.1.4"
+
+[tool.poetry.dev-dependencies]
+mock = "*"
+yapf = "*"
+pdoc3 = "*"
+nose = "*"
+nose-timer = "*"
+mypy = "*"
+coverage = "*"
+
+[tool.poetry.scripts]
+nvpy = "nvpy.nvpy:main"
+
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"
