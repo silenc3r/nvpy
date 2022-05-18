@@ -1,4 +1,4 @@
-description = '''\
+description = """\
 ============= ==========
 Key combo     Action
 ============= ==========
@@ -31,4 +31,4 @@ Ctrl-[        Same as ESC. (VIM binding)
 ENTER         Start editing currently selected note. If there's a search string but
               no notes in the list, ENTER creates a new note with that search
               string as its title.
-'''
+"""

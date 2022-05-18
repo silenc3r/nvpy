@@ -15,13 +15,15 @@ class Ucs4NotSupportedError(BaseException):
         self.char = char
 
     def __str__(self):
-        return ('non-BMP character {} is not supported.  '
-                'Please rebuild python interpreter and libraries with UCS-4 support.  '
-                'See https://github.com/cpbotha/nvpy/blob/master/docs/ucs-4.rst').format(self.char)
+        return (
+            "non-BMP character {} is not supported.  "
+            "Please rebuild python interpreter and libraries with UCS-4 support.  "
+            "See https://github.com/cpbotha/nvpy/blob/master/docs/ucs-4.rst"
+        ).format(self.char)
 
 
 def with_ucs4_error_handling(fn):
-    """ Catch the non-BMP character error and reraise the Ucs4NotSupportedError. """
+    """Catch the non-BMP character error and reraise the Ucs4NotSupportedError."""
     import functools
 
     @functools.wraps(fn)
@@ -30,7 +32,8 @@ def with_ucs4_error_handling(fn):
             return fn(*args, **kwargs)
         except TclError as e:
             import re
-            result = re.match(r'character (U\+[0-9a-f]+) is above the range \(U\+0000-U\+FFFF\) allowed by Tcl', str(e))
+
+            result = re.match(r"character (U\+[0-9a-f]+) is above the range \(U\+0000-U\+FFFF\) allowed by Tcl", str(e))
             if result:
                 char = result.group(1)
                 raise Ucs4NotSupportedError(char)

@@ -4,12 +4,14 @@ import benchmarks
 
 notes_10k = [
     notes_db.NoteInfo(
-        key='',
+        key="",
         note={
-            'content': chr(ord('a') + y) + str(x),
+            "content": chr(ord("a") + y) + str(x),
         },
         tagfound=0,
-    ) for y in range(10) for x in range(1000)
+    )
+    for y in range(10)
+    for x in range(1000)
 ]
 assert len(notes_10k) == 10000
 

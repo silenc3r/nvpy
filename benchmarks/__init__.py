@@ -1,5 +1,5 @@
 def show_profile(fn):
-    """ Decorator for unittest cases.
+    """Decorator for unittest cases.
     This decorator enables profiler in a test case and prints result. It is useful for investigating bottlenecks.
 
     Usage:

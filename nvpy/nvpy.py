@@ -35,7 +35,18 @@ from configparser import ConfigParser
 from .p3port import unicode
 import logging
 from logging.handlers import RotatingFileHandler
-from .notes_db import NotesDB, SyncError, ReadError, WriteError, SortMode, MergedSorter, PinnedSorter, AlphaSorter, DateSorter, AlphaNumSorter
+from .notes_db import (
+    NotesDB,
+    SyncError,
+    ReadError,
+    WriteError,
+    SortMode,
+    MergedSorter,
+    PinnedSorter,
+    AlphaSorter,
+    DateSorter,
+    AlphaNumSorter,
+)
 import argparse
 import os
 import traceback
@@ -62,10 +73,10 @@ else:
         # Add 'fenced code block' syntax support.
         # If you try to convert without this extension, code block is treated as inline code.
         # https://python-markdown.github.io/extensions/fenced_code_blocks/
-        'markdown.extensions.fenced_code',
+        "markdown.extensions.fenced_code",
         # Add table syntax support.
         # https://python-markdown.github.io/extensions/tables/
-        'markdown.extensions.tables',
+        "markdown.extensions.tables",
     )
 
 try:
@@ -101,6 +112,7 @@ class Config:
     @ivar files_read: list of config files that were parsed.
     @ivar ok: True if config files had a default section, False otherwise.
     """
+
     def __init__(self, app_dir: str, cfg: typing.Optional[str]):
         """
         @param app_dir: the directory containing nvpy.py
@@ -111,70 +123,69 @@ class Config:
         self.app_dir = app_dir
         # cross-platform way of getting home dir!
         # http://stackoverflow.com/a/4028943/532513
-        home = os.path.abspath(os.path.expanduser('~'))
+        home = os.path.abspath(os.path.expanduser("~"))
 
         # the file that we write user settings to, which is different
         # from the configuration files
-        self.settings_file = os.path.join(home, '.nvpy_settings')
+        self.settings_file = os.path.join(home, ".nvpy_settings")
         if is_linux:
             env_dir = os.environ.get("XDG_CACHE_HOME")
             cache_dir = pathlib.Path(env_dir) if env_dir and os.path.isabs(env_dir) else pathlib.Path.home() / ".cache"
             self.settings_file = cache_dir / "nvpy_settings"
 
-
         defaults = {
-            'app_dir': app_dir,
-            'appdir': app_dir,
-            'home': home,
-            'notes_as_txt': '0',
-            'read_txt_extensions': 'txt,mkdn,md,mdown,markdown',
-            'housekeeping_interval': '2',
-            'search_mode': 'gstyle',
-            'case_sensitive': '1',
-            'search_tags': '1',
-            'sort_mode': '1',
-            'pinned_ontop': '1',
-            'db_path': os.path.join(home, '.nvpy'),
-            'txt_path': os.path.join(home, '.nvpy/notes'),
-            'replace_filename_spaces': '1',
-            'theme': 'default',
-            'font_family': 'Courier',  # monospaced on all platforms
-            'font_size': '10',
-            'list_font_family': 'Helvetica',  # sans on all platforms
-            'list_font_family_fixed': 'Courier',  # monospace on all platforms
-            'list_font_size': '10',
-            'list_hide_time': '0',
-            'list_hide_tags': '0',
-            'underline_urls': 'true',
-            'layout': 'horizontal',
-            'print_columns': '0',
-            'text_color': 'black',
-            'selected_note_color': 'light blue',
-            'note_info_color': 'dark gray',
-            'highlight_note_info_color': 'lightyellow',
-            'url_color': '#03f',
-            'url_selection_background_color': 'yellow',
-            'background_color': 'white',
-            'highlight_background_color': 'yellow',
-            'sn_username': '',
-            'sn_password': '',
-            'simplenote_sync': '1',
-            'debug': '1',
+            "app_dir": app_dir,
+            "appdir": app_dir,
+            "home": home,
+            "notes_as_txt": "0",
+            "read_txt_extensions": "txt,mkdn,md,mdown,markdown",
+            "housekeeping_interval": "2",
+            "search_mode": "gstyle",
+            "case_sensitive": "1",
+            "search_tags": "1",
+            "sort_mode": "1",
+            "pinned_ontop": "1",
+            "db_path": os.path.join(home, ".nvpy"),
+            "txt_path": os.path.join(home, ".nvpy/notes"),
+            "replace_filename_spaces": "1",
+            "theme": "default",
+            "font_family": "Courier",  # monospaced on all platforms
+            "font_size": "10",
+            "list_font_family": "Helvetica",  # sans on all platforms
+            "list_font_family_fixed": "Courier",  # monospace on all platforms
+            "list_font_size": "10",
+            "list_hide_time": "0",
+            "list_hide_tags": "0",
+            "underline_urls": "true",
+            "layout": "horizontal",
+            "print_columns": "0",
+            "text_color": "black",
+            "selected_note_color": "light blue",
+            "note_info_color": "dark gray",
+            "highlight_note_info_color": "lightyellow",
+            "url_color": "#03f",
+            "url_selection_background_color": "yellow",
+            "background_color": "white",
+            "highlight_background_color": "yellow",
+            "sn_username": "",
+            "sn_password": "",
+            "simplenote_sync": "1",
+            "debug": "1",
             # Filename or filepath to a css file used style the rendered
             # output; e.g. nvpy.css or /path/to/my.css
-            'rest_css_path': '',
-            'md_css_path': '',
-            'md_extensions': '',
-            'keep_search_keyword': 'false',
-            'confirm_delete': 'true',
-            'escape_to_exit': 'false',
-            'confirm_exit': 'false',
-            'streamline_interface': 'false',
+            "rest_css_path": "",
+            "md_css_path": "",
+            "md_extensions": "",
+            "keep_search_keyword": "false",
+            "confirm_delete": "true",
+            "escape_to_exit": "false",
+            "confirm_exit": "false",
+            "streamline_interface": "false",
         }
 
         self.files_read, cp = self._load_cfg(defaults, cfg)
 
-        cfg_sec = 'nvpy'
+        cfg_sec = "nvpy"
 
         if not cp.has_section(cfg_sec):
             cp.add_section(cfg_sec)
@@ -186,69 +197,69 @@ class Config:
         # for the username and password, we don't want interpolation,
         # hence the raw parameter. Fixes
         # https://github.com/cpbotha/nvpy/issues/9
-        self.sn_username = cp.get(cfg_sec, 'sn_username', raw=True)
-        self.sn_password = cp.get(cfg_sec, 'sn_password', raw=True)
-        self.simplenote_sync = cp.getint(cfg_sec, 'simplenote_sync')
+        self.sn_username = cp.get(cfg_sec, "sn_username", raw=True)
+        self.sn_password = cp.get(cfg_sec, "sn_password", raw=True)
+        self.simplenote_sync = cp.getint(cfg_sec, "simplenote_sync")
         # make logic to find in $HOME if not set
-        self.db_path = cp.get(cfg_sec, 'db_path')
-        self.notes_as_txt = cp.getint(cfg_sec, 'notes_as_txt')
-        self.read_txt_extensions = cp.get(cfg_sec, 'read_txt_extensions')
-        self.txt_path = os.path.join(home, cp.get(cfg_sec, 'txt_path'))
-        self.replace_filename_spaces = cp.getint(cfg_sec, 'replace_filename_spaces')
-        self.search_mode = cp.get(cfg_sec, 'search_mode')
-        self.case_sensitive = cp.getint(cfg_sec, 'case_sensitive')
-        self.search_tags = cp.getint(cfg_sec, 'search_tags')
+        self.db_path = cp.get(cfg_sec, "db_path")
+        self.notes_as_txt = cp.getint(cfg_sec, "notes_as_txt")
+        self.read_txt_extensions = cp.get(cfg_sec, "read_txt_extensions")
+        self.txt_path = os.path.join(home, cp.get(cfg_sec, "txt_path"))
+        self.replace_filename_spaces = cp.getint(cfg_sec, "replace_filename_spaces")
+        self.search_mode = cp.get(cfg_sec, "search_mode")
+        self.case_sensitive = cp.getint(cfg_sec, "case_sensitive")
+        self.search_tags = cp.getint(cfg_sec, "search_tags")
         # See notes_db.SortMode.
-        self.sort_mode = cp.getint(cfg_sec, 'sort_mode')
-        self.pinned_ontop = cp.getint(cfg_sec, 'pinned_ontop')
-        self.housekeeping_interval = cp.getint(cfg_sec, 'housekeeping_interval')
+        self.sort_mode = cp.getint(cfg_sec, "sort_mode")
+        self.pinned_ontop = cp.getint(cfg_sec, "pinned_ontop")
+        self.housekeeping_interval = cp.getint(cfg_sec, "housekeeping_interval")
         self.housekeeping_interval_ms = self.housekeeping_interval * 1000
 
-        self.theme = cp.get(cfg_sec, 'theme')
-        self.font_family = cp.get(cfg_sec, 'font_family')
-        self.font_size = cp.getint(cfg_sec, 'font_size')
+        self.theme = cp.get(cfg_sec, "theme")
+        self.font_family = cp.get(cfg_sec, "font_family")
+        self.font_size = cp.getint(cfg_sec, "font_size")
 
-        self.list_font_family = cp.get(cfg_sec, 'list_font_family')
-        self.list_font_family_fixed = cp.get(cfg_sec, 'list_font_family_fixed')
-        self.list_font_size = cp.getint(cfg_sec, 'list_font_size')
+        self.list_font_family = cp.get(cfg_sec, "list_font_family")
+        self.list_font_family_fixed = cp.get(cfg_sec, "list_font_family_fixed")
+        self.list_font_size = cp.getint(cfg_sec, "list_font_size")
 
-        self.list_hide_time = cp.getint(cfg_sec, 'list_hide_time')
-        self.list_hide_tags = cp.getint(cfg_sec, 'list_hide_tags')
+        self.list_hide_time = cp.getint(cfg_sec, "list_hide_time")
+        self.list_hide_tags = cp.getint(cfg_sec, "list_hide_tags")
 
-        self.underline_urls = cp.getboolean(cfg_sec, 'underline_urls')
+        self.underline_urls = cp.getboolean(cfg_sec, "underline_urls")
 
-        self.layout = cp.get(cfg_sec, 'layout')
-        self.print_columns = cp.getint(cfg_sec, 'print_columns')
+        self.layout = cp.get(cfg_sec, "layout")
+        self.print_columns = cp.getint(cfg_sec, "print_columns")
 
         self.colors = ColorConfig(
-            text=cp.get(cfg_sec, 'text_color'),
-            selected_note=cp.get(cfg_sec, 'selected_note_color'),
-            note_info=cp.get(cfg_sec, 'note_info_color'),
-            highlight_note_info=cp.get(cfg_sec, 'highlight_note_info_color'),
-            url=cp.get(cfg_sec, 'url_color'),
-            url_selection_background=cp.get(cfg_sec, 'url_selection_background_color'),
-            background=cp.get(cfg_sec, 'background_color'),
-            highlight_background=cp.get(cfg_sec, 'highlight_background_color'),
+            text=cp.get(cfg_sec, "text_color"),
+            selected_note=cp.get(cfg_sec, "selected_note_color"),
+            note_info=cp.get(cfg_sec, "note_info_color"),
+            highlight_note_info=cp.get(cfg_sec, "highlight_note_info_color"),
+            url=cp.get(cfg_sec, "url_color"),
+            url_selection_background=cp.get(cfg_sec, "url_selection_background_color"),
+            background=cp.get(cfg_sec, "background_color"),
+            highlight_background=cp.get(cfg_sec, "highlight_background_color"),
         )
 
-        self.rest_css_path = cp.get(cfg_sec, 'rest_css_path')
-        self.md_css_path = cp.get(cfg_sec, 'md_css_path')
-        self.md_extensions = cp.get(cfg_sec, 'md_extensions')
-        self.debug = cp.getint(cfg_sec, 'debug')
-        self.keep_search_keyword = cp.getboolean(cfg_sec, 'keep_search_keyword')
-        self.confirm_delete = cp.getboolean(cfg_sec, 'confirm_delete')
-        self.escape_to_exit = cp.getboolean(cfg_sec, 'escape_to_exit')
-        self.confirm_exit = cp.getboolean(cfg_sec, 'confirm_exit')
+        self.rest_css_path = cp.get(cfg_sec, "rest_css_path")
+        self.md_css_path = cp.get(cfg_sec, "md_css_path")
+        self.md_extensions = cp.get(cfg_sec, "md_extensions")
+        self.debug = cp.getint(cfg_sec, "debug")
+        self.keep_search_keyword = cp.getboolean(cfg_sec, "keep_search_keyword")
+        self.confirm_delete = cp.getboolean(cfg_sec, "confirm_delete")
+        self.escape_to_exit = cp.getboolean(cfg_sec, "escape_to_exit")
+        self.confirm_exit = cp.getboolean(cfg_sec, "confirm_exit")
 
-        self.streamline_interface = cp.getboolean(cfg_sec, 'streamline_interface')
+        self.streamline_interface = cp.getboolean(cfg_sec, "streamline_interface")
 
         self.warnings = []
-        if cp.has_option(cfg_sec, 'background_full_sync'):
+        if cp.has_option(cfg_sec, "background_full_sync"):
             w = lambda: logging.warning('"background_full_sync" option is removed.')
             self.warnings.append(w)
 
     def _load_cfg(self, defaults: dict, cfg: typing.Optional[str]) -> typing.Tuple[typing.List[str], ConfigParser]:
-        """ Load configuration files.
+        """Load configuration files.
         If cfg argument is specified, read only specified file. Otherwise, read configuration files from some locations.
 
         Args:
@@ -271,7 +282,7 @@ class Config:
             elif cfg2.exists():
                 cfg_files = [cfg2]
             else:
-                logging.error(f'Not found configuration file from {cfg1} or {cfg2}')
+                logging.error(f"Not found configuration file from {cfg1} or {cfg2}")
                 cfg_files = []
         else:
             # Later config files overwrite earlier files try a number of alternatives.
@@ -279,12 +290,12 @@ class Config:
             env_dir = os.environ.get("XDG_CONFIG_HOME")
             xdg_config_home = pathlib.Path(env_dir) if env_dir and os.path.isabs(env_dir) else home / ".config"
             cfg_files = [
-                pathlib.Path(self.app_dir) / 'nvpy.cfg',
-                home / 'nvpy.cfg',
-                home / '.nvpy.cfg',
-                home / '.nvpy',
-                home / '.nvpyrc',
-                xdg_config_home / 'nvpy.cfg',
+                pathlib.Path(self.app_dir) / "nvpy.cfg",
+                home / "nvpy.cfg",
+                home / ".nvpy.cfg",
+                home / ".nvpy",
+                home / ".nvpyrc",
+                xdg_config_home / "nvpy.cfg",
             ]
         return cp.read(cfg_files), cp
 
@@ -303,12 +314,12 @@ class Config:
         elif mode == SortMode.ALPHA_NUM:
             sorters.append(AlphaNumSorter())
         else:
-            raise ValueError(f'invalid sort_mode: {mode}')
+            raise ValueError(f"invalid sort_mode: {mode}")
 
         return MergedSorter(*sorters)
 
     def show_warnings(self):
-        """ Show warnings when using obsoleted option. """
+        """Show warnings when using obsoleted option."""
         for w in self.warnings:
             w()
 
@@ -325,7 +336,7 @@ class Config:
             cp.add_section(section)
 
         cp.set(section, key, "%s" % value)
-        with open(self.settings_file, 'w') as configfile:
+        with open(self.settings_file, "w") as configfile:
             cp.write(configfile)
 
         logging.debug("Wrote [%s] %s = %s to %s" % (section, key, value, self.settings_file))
@@ -347,6 +358,7 @@ class NotesListModel(SubjectMixin):
     """
     @ivar list: List of (str key, dict note) objects.
     """
+
     def __init__(self):
         # call mixin ctor
         SubjectMixin.__init__(self)
@@ -356,11 +368,10 @@ class NotesListModel(SubjectMixin):
 
     def set_list(self, alist):
         self.list = alist
-        self.notify_observers('set:list', None)
+        self.notify_observers("set:list", None)
 
     def get_idx(self, key):
-        """Find idx for passed LOCAL key.
-        """
+        """Find idx for passed LOCAL key."""
         found = [i for i, e in enumerate(self.list) if e.key == key]
         if found:
             return found[0]
@@ -371,19 +382,19 @@ class NotesListModel(SubjectMixin):
     def get(self, key):
         idx = self.get_idx(key)
         if idx < 0:
-            raise KeyError('Note is not found: key={}'.format(key))
+            raise KeyError("Note is not found: key={}".format(key))
 
         return self.list[idx]
 
 
 class Controller:
-    """Main application class.
-    """
+    """Main application class."""
+
     SORT_MODES = {
-        'title (alphabetical order)': SortMode.ALPHA,
-        'title (alphanumerical order)': SortMode.ALPHA_NUM,
-        'modification date': SortMode.MODIFICATION_DATE,
-        'creation date': SortMode.CREATION_DATE,
+        "title (alphabetical order)": SortMode.ALPHA,
+        "title (alphanumerical order)": SortMode.ALPHA_NUM,
+        "modification date": SortMode.MODIFICATION_DATE,
+        "creation date": SortMode.CREATION_DATE,
     }
 
     def __init__(self, config):
@@ -400,30 +411,30 @@ class Controller:
         if not os.path.exists(self.config.db_path):
             os.mkdir(self.config.db_path)
 
-        log_filename = os.path.join(self.config.db_path, 'nvpy.log')
+        log_filename = os.path.join(self.config.db_path, "nvpy.log")
         # file will get nuked when it reaches 100kB
-        lhandler = RotatingFileHandler(log_filename, maxBytes=100000, backupCount=1, encoding='utf8')
+        lhandler = RotatingFileHandler(log_filename, maxBytes=100000, backupCount=1, encoding="utf8")
         lhandler.setLevel(logging.DEBUG)
-        lhandler.setFormatter(logging.Formatter(fmt='%(asctime)s - %(levelname)s - %(message)s'))
+        lhandler.setFormatter(logging.Formatter(fmt="%(asctime)s - %(levelname)s - %(message)s"))
         # we get the root logger and configure it
         logger = logging.getLogger()
         if self.config.debug == 1:
             logger.setLevel(logging.DEBUG)
         logger.addHandler(lhandler)
         # this will go to the root logger
-        logging.debug('nvpy logging initialized')
+        logging.debug("nvpy logging initialized")
 
-        logging.debug('config read from %s' % (str(self.config.files_read), ))
+        logging.debug("config read from %s" % (str(self.config.files_read),))
         self.config.show_warnings()
 
-        if self.config.sn_username == '':
+        if self.config.sn_username == "":
             self.config.simplenote_sync = 0
 
         rst_css = self.config.rest_css_path
         if rst_css:
             if rst_css.startswith("~/"):
                 # On Mac, paths that start with '~/' aren't found by path.exists
-                rst_css = rst_css.replace("~", os.path.abspath(os.path.expanduser('~')), 1)
+                rst_css = rst_css.replace("~", os.path.abspath(os.path.expanduser("~")), 1)
                 self.config.rest_css_path = rst_css
             if not os.path.exists(rst_css):
                 # Couldn't find the user-defined css file. Use docutils css instead.
@@ -432,7 +443,7 @@ class Controller:
         if md_css:
             if md_css.startswith("~/"):
                 # On Mac, paths that start with '~/' aren't found by path.exists
-                md_css = md_css.replace("~", os.path.abspath(os.path.expanduser('~')), 1)
+                md_css = md_css.replace("~", os.path.abspath(os.path.expanduser("~")), 1)
                 self.config.md_css_path = md_css
             if not os.path.exists(md_css):
                 # Couldn't find the user-defined css file.
@@ -450,46 +461,46 @@ class Controller:
                 self.notes_db = NotesDB(self.config)
             except ReadError as e:
                 emsg = "Please check nvpy.log.\n" + str(e)
-                self.view.show_error('Sync error', emsg)
+                self.view.show_error("Sync error", emsg)
                 exit(1)
 
-            self.notes_db.add_observer('saved:note', self.observer_notes_db_saved_note)
-            self.notes_db.add_observer('synced:note', self.observer_notes_db_synced_note)
-            self.notes_db.add_observer('change:note-status', self.observer_notes_db_change_note_status)
+            self.notes_db.add_observer("saved:note", self.observer_notes_db_saved_note)
+            self.notes_db.add_observer("synced:note", self.observer_notes_db_synced_note)
+            self.notes_db.add_observer("change:note-status", self.observer_notes_db_change_note_status)
 
             if self.config.simplenote_sync:
-                self.notes_db.add_observer('progress:sync_full', self.observer_notes_db_sync_full)
-                self.notes_db.add_observer('error:sync_full', self.observer_notes_db_error_sync_full)
-                self.notes_db.add_observer('complete:sync_full', self.observer_notes_db_complete_sync_full)
+                self.notes_db.add_observer("progress:sync_full", self.observer_notes_db_sync_full)
+                self.notes_db.add_observer("error:sync_full", self.observer_notes_db_error_sync_full)
+                self.notes_db.add_observer("complete:sync_full", self.observer_notes_db_complete_sync_full)
 
             # we want to be notified when the user does stuff
-            self.view.add_observer('click:notelink', self.observer_view_click_notelink)
-            self.view.add_observer('delete:note', self.observer_view_delete_note)
-            self.view.add_observer('select:note', self.observer_view_select_note)
-            self.view.add_observer('change:entry', self.observer_view_change_entry)
-            self.view.add_observer('change:text', self.observer_view_change_text)
-            self.view.add_observer('change:pinned', self.observer_view_change_pinned)
-            self.view.add_observer('create:note', self.observer_view_create_note)
-            self.view.add_observer('keep:house', self.observer_view_keep_house)
-            self.view.add_observer('command:markdown', self.observer_view_markdown)
-            self.view.add_observer('command:rest', self.observer_view_rest)
-            self.view.add_observer('delete:tag', self.observer_view_delete_tag)
-            self.view.add_observer('add:tag', self.observer_view_add_tag)
-            self.view.add_observer('change:sort_mode', self.observer_view_change_sort_mode)
-            self.view.add_observer('change:pinned_on_top', self.observer_view_change_pinned_on_top)
+            self.view.add_observer("click:notelink", self.observer_view_click_notelink)
+            self.view.add_observer("delete:note", self.observer_view_delete_note)
+            self.view.add_observer("select:note", self.observer_view_select_note)
+            self.view.add_observer("change:entry", self.observer_view_change_entry)
+            self.view.add_observer("change:text", self.observer_view_change_text)
+            self.view.add_observer("change:pinned", self.observer_view_change_pinned)
+            self.view.add_observer("create:note", self.observer_view_create_note)
+            self.view.add_observer("keep:house", self.observer_view_keep_house)
+            self.view.add_observer("command:markdown", self.observer_view_markdown)
+            self.view.add_observer("command:rest", self.observer_view_rest)
+            self.view.add_observer("delete:tag", self.observer_view_delete_tag)
+            self.view.add_observer("add:tag", self.observer_view_add_tag)
+            self.view.add_observer("change:sort_mode", self.observer_view_change_sort_mode)
+            self.view.add_observer("change:pinned_on_top", self.observer_view_change_pinned_on_top)
 
             if self.config.simplenote_sync:
-                self.view.add_observer('command:sync_full', lambda v, et, e: self.sync_full())
-                self.view.add_observer('command:sync_current_note', self.observer_view_sync_current_note)
+                self.view.add_observer("command:sync_full", lambda v, et, e: self.sync_full())
+                self.view.add_observer("command:sync_current_note", self.observer_view_sync_current_note)
 
-            self.view.add_observer('close', self.observer_view_close)
+            self.view.add_observer("close", self.observer_view_close)
 
             # setup UI to reflect our search mode and case sensitivity
             self.view.set_cs(self.config.case_sensitive, silent=True)
             self.view.set_search_mode(self.config.search_mode, silent=True)
 
-            self.view.add_observer('change:cs', self.observer_view_change_cs)
-            self.view.add_observer('change:search_mode', self.observer_view_change_search_mode)
+            self.view.add_observer("change:cs", self.observer_view_change_cs)
+            self.view.add_observer("change:search_mode", self.observer_view_change_search_mode)
 
             # nn is a list of (key, note) objects
             nn, match_regexp, active_notes = self.notes_db.filter_notes()
@@ -513,14 +524,15 @@ class Controller:
     def main_loop(self):
         if not self.config.files_read:
             self.view.show_warning(
-                'No config file',
-                'Could not read any configuration files. See https://github.com/cpbotha/nvpy for details.')
+                "No config file",
+                "Could not read any configuration files. See https://github.com/cpbotha/nvpy for details.",
+            )
 
         elif not self.config.ok:
-            wmsg = ('Please rename [default] to [nvpy] in %s. ' + \
-                    'Config file format changed after nvPY 0.8.') % \
-            (str(self.config.files_read),)
-            self.view.show_warning('Rename config section', wmsg)
+            wmsg = ("Please rename [default] to [nvpy] in %s. " + "Config file format changed after nvPY 0.8.") % (
+                str(self.config.files_read),
+            )
+            self.view.show_warning("Rename config section", wmsg)
 
         def poll_notifies():
             self.view.after(100, poll_notifies)
@@ -554,18 +566,16 @@ class Controller:
         try:
             raise evt.error
         except (SyncError, HTTPException) as e:
-            self.view.show_error('Sync error', e)
+            self.view.show_error("Sync error", e)
         except WriteError as e:
             emsg = "Please check nvpy.log.\n" + str(e)
-            self.view.show_error('Sync error', emsg)
+            self.view.show_error("Sync error", emsg)
             exit(1)
         except Exception as e:
-            crash_log = ''.join(traceback.format_exception(*evt.exc_info))
+            crash_log = "".join(traceback.format_exception(*evt.exc_info))
             logging.error(crash_log)
-            emsg = 'An unexpected error has occurred.\n'\
-                   'Please check nvpy.log.\n' \
-                   + repr(e)
-            self.view.show_error('Sync error', emsg)
+            emsg = "An unexpected error has occurred.\n" "Please check nvpy.log.\n" + repr(e)
+            self.view.show_error("Sync error", emsg)
             exit(1)
 
         # return normal status from "Full syning".
@@ -575,8 +585,9 @@ class Controller:
         sync_from_server_errors = evt.errors
         if sync_from_server_errors > 0:
             self.view.show_error(
-                'Error syncing notes from server',
-                'Error syncing %d notes from server. Please check nvpy.log for details.' % (sync_from_server_errors, ))
+                "Error syncing notes from server",
+                "Error syncing %d notes from server. Please check nvpy.log for details." % (sync_from_server_errors,),
+            )
 
         # return normal status from "Full syning".
         self.update_note_status()
@@ -594,7 +605,7 @@ class Controller:
         if self.selected_note_key is not None and self.selected_note_key == evt.lkey:
             selected_note_o = self.notes_list_model.get(self.selected_note_key)
             content = self.notes_db.get_note_content(evt.lkey)
-            if selected_note_o.note['content'] != content:
+            if selected_note_o.note["content"] != content:
                 self.view.mute_note_data_changes()
                 # in this case, we want to keep the user's undo buffer so that they
                 # can undo synced back changes if they would want to.
@@ -637,10 +648,10 @@ class Controller:
         if self.selected_note_key:
             key = self.selected_note_key
             c = self.notes_db.get_note_content(key)
-            logging.debug("Trying to convert %s to html." % (key, ))
+            logging.debug("Trying to convert %s to html." % (key,))
             if HAVE_MARKDOWN:
-                logging.debug("Convert note %s to html." % (key, ))
-                exts = re.split('\s+', self.config.md_extensions.strip()) if self.config.md_extensions else []
+                logging.debug("Convert note %s to html." % (key,))
+                exts = re.split("\s+", self.config.md_extensions.strip()) if self.config.md_extensions else []
                 exts += list(DEFAULT_MARKDOWN_EXTS)
                 # remove duplicate items on exts.
                 exts = list(set(exts))
@@ -648,20 +659,20 @@ class Controller:
                 html = markdown.markdown(c, extensions=exts)
                 logging.debug("Convert done.")
                 if self.config.md_css_path:
-                    css = u"""<link rel="stylesheet" href="%s">""" % (self.config.md_css_path, )
-                    html = u"""<div class="markdown-body">%s</div>""" % (html, )
+                    css = """<link rel="stylesheet" href="%s">""" % (self.config.md_css_path,)
+                    html = """<div class="markdown-body">%s</div>""" % (html,)
                 else:
-                    css = u""""""
+                    css = """"""
 
             else:
                 logging.debug("Markdown not installed.")
                 html = "<p>python markdown not installed, required for rendering to HTML.</p>"
-                html += "<p>Please install with \"pip install markdown\".</p>"
+                html += '<p>Please install with "pip install markdown".</p>'
 
             # create filename based on key
-            fn = os.path.join(self.config.db_path, key + '.html')
-            f = codecs.open(fn, mode='wb', encoding='utf-8')
-            s = u"""
+            fn = os.path.join(self.config.db_path, key + ".html")
+            f = codecs.open(fn, mode="wb", encoding="utf-8")
+            s = """
 <html>
 <head>
 <meta http-equiv="Content-Type" content="text/html; charset=UTF-8"/>
@@ -688,26 +699,28 @@ class Controller:
             if HAVE_DOCUTILS:
                 settings = {}
                 if self.config.rest_css_path:
-                    settings['stylesheet_path'] = self.config.rest_css_path
+                    settings["stylesheet_path"] = self.config.rest_css_path
                 # this gives the whole document
-                html = docutils.core.publish_string(c, writer_name='html', settings_overrides=settings)
+                html = docutils.core.publish_string(c, writer_name="html", settings_overrides=settings)
                 # publish_parts("*anurag*",writer_name='html')['body']
                 # gives just the desired part of the tree
 
             else:
                 html = "<p>python docutils not installed, required for rendering reST to HTML.</p>"
-                html += "<p>Please install with \"pip install docutils\".</p>"
+                html += '<p>Please install with "pip install docutils".</p>'
 
             # create filename based on key
-            fn = os.path.join(self.config.db_path, key + '_rest.html')
-            f = codecs.open(fn, mode='wb', encoding='utf-8')
+            fn = os.path.join(self.config.db_path, key + "_rest.html")
+            f = codecs.open(fn, mode="wb", encoding="utf-8")
 
             # explicit decode from utf8 into unicode object. If we don't
             # specify utf8, python falls back to default ascii and then we get
             # "'ascii' codec can't decode byte" error
-            s = u"""
+            s = """
 %s
-            """ % (unicode(html, 'utf8'), )
+            """ % (
+                unicode(html, "utf8"),
+            )
 
             f.write(s)
             f.close()
@@ -716,13 +729,13 @@ class Controller:
     def observer_view_markdown(self, view, evt_type, evt):
         fn = self.helper_markdown_to_html()
         # turn filename into URI (mac wants this)
-        fn_uri = 'file://' + os.path.abspath(fn)
+        fn_uri = "file://" + os.path.abspath(fn)
         webbrowser.open(fn_uri)
 
     def observer_view_rest(self, view, evt_type, evt):
         fn = self.helper_rest_to_html()
         # turn filename into URI (mac wants this)
-        fn_uri = 'file://' + os.path.abspath(fn)
+        fn_uri = "file://" + os.path.abspath(fn)
         webbrowser.open(fn_uri)
 
     def helper_save_sync_msg(self):
@@ -738,11 +751,11 @@ class Controller:
         else:
             syncn = wfsn = 0
 
-        savet = 'Saving %d notes.' % (saven, ) if saven > 0 else ''
-        synct = 'Waiting to sync %d notes.' % (syncn, ) if syncn > 0 else ''
-        wfsnt = 'Syncing with simplenote server.' if wfsn else ''
+        savet = "Saving %d notes." % (saven,) if saven > 0 else ""
+        synct = "Waiting to sync %d notes." % (syncn,) if syncn > 0 else ""
+        wfsnt = "Syncing with simplenote server." if wfsn else ""
 
-        return ' '.join([i for i in [savet, synct, wfsnt] if i])
+        return " ".join([i for i in [savet, synct, wfsnt] if i])
 
     def observer_view_keep_house(self, view, evt_type, evt):
         # queue up all notes that need to be saved
@@ -752,7 +765,7 @@ class Controller:
         if self.config.simplenote_sync:
             nsynced, sync_errors = self.notes_db.sync_to_server_threaded()
             if sync_errors:
-                msg = ' '.join([i for i in [msg, 'Could not connect to simplenote server.'] if i])
+                msg = " ".join([i for i in [msg, "Could not connect to simplenote server."] if i])
 
         self.view.set_status_text(msg)
 
@@ -771,13 +784,13 @@ class Controller:
             ret = self.notes_db.sync_note_unthreaded(key)
             if ret and ret[1] == True:
                 self.view.update_selected_note_data(self.notes_db.notes[key])
-                self.view.set_status_text('Synced updated note from server.')
+                self.view.set_status_text("Synced updated note from server.")
 
             elif ret and ret[1] == False:
-                self.view.set_status_text('Server had nothing newer for this note.')
+                self.view.set_status_text("Server had nothing newer for this note.")
 
             elif ret is None:
-                self.view.set_status_text('Unable to sync with server. Offline?')
+                self.view.set_status_text("Unable to sync with server. Offline?")
 
     def observer_view_change_cs(self, view, evt_type, evt: events.CheckboxChangedEvent):
         # evt.value is the new value
@@ -825,7 +838,7 @@ class Controller:
             # currently being displayed. this could happen if a sync gets
             # a new note of the server to replace the currently displayed one.
             if self.view.is_note_different(new_note):
-                logging.debug("Currently selected note %s replaced by newer from server." % (k, ))
+                logging.debug("Currently selected note %s replaced by newer from server." % (k,))
                 # carefully update currently selected note
                 # restore cursor position, search and link highlights
                 self.view.update_selected_note_data(new_note)
@@ -849,7 +862,7 @@ class Controller:
     def observer_view_add_tag(self, view, evt_type, evt: events.TagsAddedEvent):
         self.notes_db.add_note_tags(self.selected_note_key, evt.tags)
         self.view.cmd_notes_list_select()
-        self.view.tags_entry_var.set('')
+        self.view.tags_entry_var.set("")
 
     def observer_view_change_pinned(self, view, evt_type, evt: events.CheckboxChangedEvent):
         # get new text and update our database
@@ -891,7 +904,7 @@ class Controller:
         else:
             if self.config.confirm_exit:
                 msg = "Do you want to exit?"
-                if not self.view.askyesno('Confirm exit', msg):
+                if not self.view.askyesno("Confirm exit", msg):
                     return
 
             self.view.close()
@@ -900,7 +913,7 @@ class Controller:
         # create the note
         new_key = self.notes_db.create_note(evt.title)
         # clear the search entry, this should trigger a new list being returned
-        keyword = ''
+        keyword = ""
         if self.config.keep_search_keyword:
             keyword = self.view.get_search_entry_text()
         self.view.set_search_entry_text(keyword)
@@ -953,8 +966,8 @@ class Controller:
 
 def get_appdir():
     # setup appdir
-    if hasattr(sys, 'frozen') and sys.frozen:
-        if hasattr(sys, '_MEIPASS'):
+    if hasattr(sys, "frozen") and sys.frozen:
+        if hasattr(sys, "_MEIPASS"):
             # PyInstaller
             appdir = sys._MEIPASS
 
@@ -964,9 +977,11 @@ def get_appdir():
             # Use certificate from certifi only if cafile could not find by ssl.
             # See https://github.com/pyinstaller/pyinstaller/pull/3952
             import ssl
+
             if ssl.get_default_verify_paths().cafile is None:
                 import certifi
-                os.environ['SSL_CERT_FILE'] = certifi.core.where()
+
+                os.environ["SSL_CERT_FILE"] = certifi.core.where()
         else:
             # py2exe
             appdir, _ = os.path.split(sys.executable)
@@ -984,7 +999,7 @@ def get_appdir():
 
 
 def parse_cmd_line_args(args: typing.Optional[typing.List] = None) -> argparse.Namespace:
-    """ Parse command line arguments
+    """Parse command line arguments
 
     Args:
         args: List of command line arguments. If args is not specified, takes args from sys.args.
@@ -993,7 +1008,7 @@ def parse_cmd_line_args(args: typing.Optional[typing.List] = None) -> argparse.N
         A namespace object generated by argparse.
     """
     parser = argparse.ArgumentParser()
-    parser.add_argument('--cfg', '-c', dest='cfg', metavar='nvpy.cfg', help='path to config file')
+    parser.add_argument("--cfg", "-c", dest="cfg", metavar="nvpy.cfg", help="path to config file")
     return parser.parse_args(args)
 
 
@@ -1007,9 +1022,10 @@ def main(args: typing.Optional[typing.List] = None):
     except tk.Ucs4NotSupportedError as e:
         logging.error(str(e))
         import tkMessageBox  # type:ignore
-        tkMessageBox.showerror('UCS-4 not supported', str(e))
+
+        tkMessageBox.showerror("UCS-4 not supported", str(e))
         raise
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

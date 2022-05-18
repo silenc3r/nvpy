@@ -59,17 +59,20 @@ def make_style():
 
     style.element_create("Search.field", "image", "search1", ("focus", "search2"), border=[22, 7, 14], sticky="ew")
 
-    style.layout("Search.entry", [
-        ("Search.field", {
-            "sticky": "nswe",
-            "border": 1,
-            "children": [("Entry.padding", {
-                "sticky": "nswe",
-                "children": [("Entry.textarea", {
-                    "sticky": "nswe"
-                })]
-            })]
-        })
-    ])
+    style.layout(
+        "Search.entry",
+        [
+            (
+                "Search.field",
+                {
+                    "sticky": "nswe",
+                    "border": 1,
+                    "children": [
+                        ("Entry.padding", {"sticky": "nswe", "children": [("Entry.textarea", {"sticky": "nswe"})]})
+                    ],
+                },
+            )
+        ],
+    )
 
-    #style.configure("Search.entry", background="#b2b2b2")
+    # style.configure("Search.entry", background="#b2b2b2")

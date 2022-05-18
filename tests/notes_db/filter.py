@@ -5,39 +5,39 @@ from nvpy.notes_db import NotesDB
 from ._mixin import DBMixin
 
 notes = {
-    '1': {
-        'modifydate': 1111111222,
-        'tags': [],
-        'createdate': 1111111111,
-        'syncdate': 0,
-        'content': 'active note 1',
-        'savedate': 0,
+    "1": {
+        "modifydate": 1111111222,
+        "tags": [],
+        "createdate": 1111111111,
+        "syncdate": 0,
+        "content": "active note 1",
+        "savedate": 0,
     },
-    '2': {
-        'modifydate': 1111111222,
-        'tags': [],
-        'createdate': 1111111111,
-        'syncdate': 0,
-        'content': 'active note 2',
-        'savedate': 0,
+    "2": {
+        "modifydate": 1111111222,
+        "tags": [],
+        "createdate": 1111111111,
+        "syncdate": 0,
+        "content": "active note 2",
+        "savedate": 0,
     },
-    '3': {
-        'modifydate': 1111111222,
-        'tags': ['foo'],
-        'createdate': 1111111111,
-        'syncdate': 0,
-        'content': 'active note 3',
-        'savedate': 0,
+    "3": {
+        "modifydate": 1111111222,
+        "tags": ["foo"],
+        "createdate": 1111111111,
+        "syncdate": 0,
+        "content": "active note 3",
+        "savedate": 0,
     },
-    '4': {
-        'modifydate': 1111111222,
-        'tags': [],
-        'createdate': 1111111111,
-        'syncdate': 0,
-        'content': 'deleted note',
-        'savedate': 0,
-        'deleted': True,
-    }
+    "4": {
+        "modifydate": 1111111222,
+        "tags": [],
+        "createdate": 1111111111,
+        "syncdate": 0,
+        "content": "deleted note",
+        "savedate": 0,
+        "deleted": True,
+    },
 }
 
 
@@ -47,29 +47,29 @@ class FilterGstyle(DBMixin, unittest.TestCase):
         db.notes = copy.deepcopy(notes)
         filtered_notes, match_regexp, active_notes = db.filter_notes_gstyle()
         self.assertEqual(len(filtered_notes), 3)
-        self.assertEqual(match_regexp, '')
+        self.assertEqual(match_regexp, "")
         self.assertEqual(active_notes, 3)
-        filtered_notes, match_regexp, active_notes = db.filter_notes_gstyle('')
+        filtered_notes, match_regexp, active_notes = db.filter_notes_gstyle("")
         self.assertEqual(len(filtered_notes), 3)
-        self.assertEqual(match_regexp, '')
+        self.assertEqual(match_regexp, "")
         self.assertEqual(active_notes, 3)
 
     def test_search_by_tag(self):
         db = self._db()
         db.notes = copy.deepcopy(notes)
-        filtered_notes, match_regexp, active_notes = db.filter_notes_gstyle('tag:foo')
+        filtered_notes, match_regexp, active_notes = db.filter_notes_gstyle("tag:foo")
         self.assertEqual(len(filtered_notes), 1)
-        self.assertEqual(filtered_notes[0].note['content'], notes['3']['content'])
-        self.assertEqual(match_regexp, '')  # Should ignore for tag pattern
+        self.assertEqual(filtered_notes[0].note["content"], notes["3"]["content"])
+        self.assertEqual(match_regexp, "")  # Should ignore for tag pattern
         self.assertEqual(active_notes, 3)
 
     def test_search_by_single_words(self):
         db = self._db()
         db.notes = copy.deepcopy(notes)
-        filtered_notes, match_regexp, active_notes = db.filter_notes_gstyle('note 1 active')
+        filtered_notes, match_regexp, active_notes = db.filter_notes_gstyle("note 1 active")
         self.assertEqual(len(filtered_notes), 1)
-        self.assertEqual(filtered_notes[0].note['content'], notes['1']['content'])
-        self.assertEqual(match_regexp, 'note|1|active')  # Should ignore for tag pattern
+        self.assertEqual(filtered_notes[0].note["content"], notes["1"]["content"])
+        self.assertEqual(match_regexp, "note|1|active")  # Should ignore for tag pattern
         self.assertEqual(active_notes, 3)
 
     def test_search_by_multi_word(self):
@@ -77,8 +77,8 @@ class FilterGstyle(DBMixin, unittest.TestCase):
         db.notes = copy.deepcopy(notes)
         filtered_notes, match_regexp, active_notes = db.filter_notes_gstyle('"note 1" active')
         self.assertEqual(len(filtered_notes), 1)
-        self.assertEqual(filtered_notes[0].note['content'], notes['1']['content'])
-        self.assertEqual(match_regexp, r'note\ 1|active')  # Should ignore for tag pattern
+        self.assertEqual(filtered_notes[0].note["content"], notes["1"]["content"])
+        self.assertEqual(match_regexp, r"note\ 1|active")  # Should ignore for tag pattern
         self.assertEqual(active_notes, 3)
 
 
@@ -88,25 +88,25 @@ class FilterRegexp(DBMixin, unittest.TestCase):
         db.notes = copy.deepcopy(notes)
         filtered_notes, match_regexp, active_notes = db.filter_notes_regexp()
         self.assertEqual(len(filtered_notes), 3)
-        self.assertEqual(match_regexp, '')
+        self.assertEqual(match_regexp, "")
         self.assertEqual(active_notes, 3)
-        filtered_notes, match_regexp, active_notes = db.filter_notes_regexp('')
+        filtered_notes, match_regexp, active_notes = db.filter_notes_regexp("")
         self.assertEqual(len(filtered_notes), 3)
-        self.assertEqual(match_regexp, '')
+        self.assertEqual(match_regexp, "")
         self.assertEqual(active_notes, 3)
 
     def test_search_by_invalid_regexp(self):
         db = self._db()
         db.notes = copy.deepcopy(notes)
-        filtered_notes, match_regexp, active_notes = db.filter_notes_regexp('(deleted')
+        filtered_notes, match_regexp, active_notes = db.filter_notes_regexp("(deleted")
         self.assertEqual(len(filtered_notes), 3)
-        self.assertEqual(match_regexp, '')
+        self.assertEqual(match_regexp, "")
         self.assertEqual(active_notes, 3)
 
     def test_search_by_valid_regexp(self):
         db = self._db()
         db.notes = copy.deepcopy(notes)
-        filtered_notes, match_regexp, active_notes = db.filter_notes_regexp('foo| [12]')
+        filtered_notes, match_regexp, active_notes = db.filter_notes_regexp("foo| [12]")
         self.assertEqual(len(filtered_notes), 3)
-        self.assertEqual(match_regexp, 'foo| [12]')
+        self.assertEqual(match_regexp, "foo| [12]")
         self.assertEqual(active_notes, 3)
