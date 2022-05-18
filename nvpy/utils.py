@@ -14,7 +14,7 @@ import threading
 from . import tk
 
 # first line with non-whitespace should be the title
-note_title_re = re.compile("\s*(.*)\n?")
+note_title_re = re.compile(r"\s*(.*)\n?")
 
 
 def generate_random_key():
@@ -46,7 +46,7 @@ def get_note_title_file(note, replace_filename_spaces):
         if isinstance(fn, str):
             fn = unicode(fn, "utf-8")
         else:
-            fn = unicode(fn)
+            fn = unicode(fn, None)
 
         if note_markdown(note):
             fn += ".mkdn"
@@ -162,7 +162,7 @@ class SubjectMixin:
     #
     # Workaround for missing the threading.main_thread() function on Python 2.7.
     # This variable was updated by the Controller.__init__().
-    MAIN_THREAD = None
+    MAIN_THREAD: threading.Thread
 
     def __init__(self):
         self.observers = {}

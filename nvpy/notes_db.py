@@ -186,7 +186,7 @@ class AlphaNumSorter(Sorter):
 
         @classmethod
         def __class_getitem__(cls, item):
-            return typing.TypeAlias(AlphaNumSorter.Nullable)
+            return typing.TypeAlias()
 
         def __init__(self, val):
             self.val = val
@@ -563,7 +563,7 @@ class NotesDB(utils.SubjectMixin):
         # example result for 't:tag1 t:tag2 word1 "word2 word3" tag:tag3' ==
         # [('', 'tag1', '', ''), ('', 'tag2', '', ''), ('', '', '', 'word1'), ('', '', 'word2 word3', ''), ('ag', 'tag3', '', '')]
 
-        groups = re.findall('t(ag)?:([^\s]+)|"([^"]+)"|([^\s]+)', search_string)
+        groups = re.findall(r't(ag)?:([^\s]+)|"([^"]+)"|([^\s]+)', search_string)
         tms_pats: typing.List[typing.List[str]] = [[] for _ in range(3)]
 
         # we end up with [[tag_pats],[multi_word_pats],[single_word_pats]]
@@ -782,7 +782,7 @@ class NotesDB(utils.SubjectMixin):
                 n = gret[0]
 
                 if Note(n).is_newer_than(note):
-                    n["syncdate"] = time.time()
+                    n["syncdate"] = time.time()  # type: ignore
                     note.update(n)
                     return (k, True)
 
@@ -973,7 +973,7 @@ class NotesDB(utils.SubjectMixin):
 
             # 3. Delete local notes not included in full note list.
             server_keys = {}
-            for n in nl:
+            for n in nl:  # type: ignore
                 k = n.get("key")
                 server_keys[k] = True
 
@@ -1041,8 +1041,9 @@ class NotesDB(utils.SubjectMixin):
                     if err == 0:
                         with self.notes_lock:
                             self.notes[k] = n
-                            n["savedate"] = 0  # never been written to disc
-                            n["syncdate"] = time.time()
+                            # never been written to disc
+                            n["savedate"] = 0  # type: ignore
+                            n["syncdate"] = time.time()  # type: ignore
                             self.helper_save_note(k, n)
                             self.notify_observers(
                                 "progress:sync_full",
@@ -1086,15 +1087,15 @@ class NotesDB(utils.SubjectMixin):
         note["modifydate"] = time.time()
         self.notify_observers("change:note-status", events.NoteStatusChangedEvent(what="modifydate", key=key))
 
-    def add_note_tags(self, key, comma_seperated_tags: str):
-        new_tags = utils.sanitise_tags(comma_seperated_tags)
+    def add_note_tags(self, key, comma_separated_tags: str):
+        new_tags = utils.sanitise_tags(comma_separated_tags)
         note = self.notes[key]
         tags_set = set(note.get("tags")) | set(new_tags)
         note["tags"] = sorted(tags_set)
         note["modifydate"] = time.time()
         self.notify_observers("change:note-status", events.NoteStatusChangedEvent(what="modifydate", key=key))
 
-    def set_note_pinned(self, key, pinned):
+    def set_note_pinned(self, key, pinned: int):
         n = self.notes[key]
         old_pinned = utils.note_pinned(n)
         if pinned != old_pinned:

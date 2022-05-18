@@ -11,7 +11,7 @@ class NoteSelectionChangedEvent(typing.NamedTuple):
 
 
 class CheckboxChangedEvent(typing.NamedTuple):
-    value: bool
+    value: str
 
 
 class TextBoxChangedEvent(typing.NamedTuple):

@@ -6,7 +6,7 @@
 # module namespace. I don't like that, so first pulling into this module
 # tk, then can use tk.whatever in main module.
 
-from tkinter import *
+from tkinter import *  # type:ignore
 from tkinter.ttk import *  # type:ignore
 
 

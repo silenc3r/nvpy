@@ -160,13 +160,13 @@ class SuggestionEntry(tk.Entry):
             kwargs["textvariable"] = self.var
 
         self.completion_func = completion_func
-        self.listbox = None
+        self.listbox: tk.Listbox | None = None
         self.listbox_height = 6  # lines
         self.listbox_lines = 0
         tk.Entry.__init__(self, *args, **kwargs)
 
         # apply a monkey patch.
-        self.orig_bind, self.bind = self.bind, self.new_bind
+        self.orig_bind, self.bind = self.bind, self.new_bind  # type: ignore
 
         self.var.trace("w", self.changed)
         self.orig_bind("<Right>", self.selection)
@@ -242,6 +242,9 @@ class SuggestionEntry(tk.Entry):
         self._select_listbox(index)
 
     def _select_listbox(self, index):
+        if self.listbox is None:
+            return
+
         for old_index in self.listbox.curselection():
             self.listbox.selection_clear(first=old_index)
 
@@ -279,10 +282,10 @@ class SuggestionEntry(tk.Entry):
             self._create_listbox()
             self._update_listbox()
 
-        if len(self.listbox.curselection()) == 0:
+        if len(self.listbox.curselection()) == 0:  # type: ignore
             index = "0"
         else:
-            oldIndex = self.listbox.curselection()[0]
+            oldIndex = self.listbox.curselection()[0]  # type:ignore
             index = str(int(oldIndex) - 1)
         self._select_listbox(index)
 
@@ -291,10 +294,10 @@ class SuggestionEntry(tk.Entry):
             self._create_listbox()
             self._update_listbox()
 
-        if len(self.listbox.curselection()) == 0:
+        if len(self.listbox.curselection()) == 0:  # type: ignore
             index = "0"
         else:
-            oldIndex = self.listbox.curselection()[0]
+            oldIndex = self.listbox.curselection()[0]  # type: ignore
             index = str(int(oldIndex) + 1)
         self._select_listbox(index)
 
@@ -1240,7 +1243,7 @@ class View(utils.SubjectMixin):
         self.root.config(menu=menu)
 
         file_menu = tk.Menu(menu, tearoff=False)
-        menu.add_cascade(label="File", underline="0", menu=file_menu)
+        menu.add_cascade(label="File", underline=0, menu=file_menu)
 
         # FILE ##########################################################
         file_menu.add_command(label="New note", underline=0, command=self.cmd_root_new, accelerator="Ctrl+N")
@@ -1345,9 +1348,9 @@ class View(utils.SubjectMixin):
 
         search_menu.add_separator()
 
-        self.cs_checkbutton_var = tk.IntVar()
+        self.cs_checkbutton_var = tk.StringVar()
 
-        search_menu.add_checkbutton(label="Case sensitive", onvalue=1, offvalue=0, variable=self.cs_checkbutton_var)
+        search_menu.add_checkbutton(label="Case sensitive", onvalue="1", offvalue="0", variable=self.cs_checkbutton_var)
 
         # TOOLS ########################################################
         tools_menu = tk.Menu(menu, tearoff=False)
@@ -1363,7 +1366,7 @@ class View(utils.SubjectMixin):
 
         # HELP ##########################################################
         help_menu = tk.Menu(menu, tearoff=False)
-        menu.add_cascade(label="Help", underline="0", menu=help_menu)
+        menu.add_cascade(label="Help", underline=0, menu=help_menu)
 
         help_menu.add_command(label="About", underline=0, command=self.cmd_help_about)
         help_menu.add_command(label="Bindings", underline=0, command=self.cmd_help_bindings, accelerator="Ctrl+?")
@@ -1403,7 +1406,7 @@ class View(utils.SubjectMixin):
         iconpath = os.path.join(self.config.app_dir, "icons", icon_fn)
 
         self.icon = tk.PhotoImage(file=iconpath)
-        self.root.tk.call("wm", "iconphoto", self.root._w, self.icon)
+        self.root.tk.call("wm", "iconphoto", self.root._w, self.icon)  # type: ignore
 
         # create menu ###################################################
         self._create_menu()
@@ -1493,7 +1496,7 @@ class View(utils.SubjectMixin):
             paned_window.pack(fill=tk.BOTH, expand=1)
 
             list_frame = tk.Frame(paned_window, height=nl_height)
-            list_frame.pack_propagate(0)
+            list_frame.pack_propagate(False)
             paned_window.add(list_frame)
 
             if self.config.print_columns == 1:
@@ -1555,7 +1558,7 @@ class View(utils.SubjectMixin):
                 width=TEXT_WIDTH,
                 wrap=tk.WORD,
                 font=f,
-                tabs=(4 * f.measure(0), "left"),
+                tabs=(4 * f.measure("0"), "left"),
                 tabstyle="wordprocessor",
                 spacing1=2,
                 spacing2=2,
@@ -1687,9 +1690,11 @@ class View(utils.SubjectMixin):
     def cmd_help_about(self):
         tkMessageBox.showinfo(
             "Help | About",
-            "nvPY %s - A rather ugly but cross-platform simplenote client.\n\n"
-            "Copyright 2017-2020 yuuki0xff <https://yuuki0xff.jp/>\n"
-            "Copyright 2012-2016 Charl P. Botha <http://charlbotha.com/>\n" % (self.config.app_version,),
+            (
+                "nvPY %s - A rather ugly but cross-platform simplenote client.\n\n"
+                + "Copyright 2017-2020 yuuki0xff <https://yuuki0xff.jp/>\n"
+                + "Copyright 2012-2016 Charl P. Botha <http://charlbotha.com/>\n" % (self.config.app_version,)
+            ),
             parent=self.root,
         )
 
@@ -1731,7 +1736,8 @@ class View(utils.SubjectMixin):
         self.handler_pinned_checkbutton()
 
     def handler_pinned_checkbutton(self, *args):
-        self.notify_observers("change:pinned", events.CheckboxChangedEvent(value=self.pinned_checkbutton_var.get()))
+        pinned_str = str(self.pinned_checkbutton_var.get())
+        self.notify_observers("change:pinned", events.CheckboxChangedEvent(value=pinned_str))
 
     def handler_search_enter(self, evt):
         # user has pressed enter whilst searching
@@ -1774,7 +1780,8 @@ class View(utils.SubjectMixin):
         self.notify_observers("change:search_mode", events.CheckboxChangedEvent(value=self.search_mode_var.get()))
 
     def handler_add_tags_to_selected_note(self, evt=None):
-        self.notify_observers("add:tag", events.TagsAddedEvent(tags=self.tags_entry_var.get()))
+        tag_list = self.tags_entry_var.get().split(",")
+        self.notify_observers("add:tag", events.TagsAddedEvent(tags=tag_list))
 
     def handler_click_link(self, link):
         if link.startswith("[["):
@@ -1783,7 +1790,7 @@ class View(utils.SubjectMixin):
 
         else:
             if platform.system().lower() == "windows":
-                os.startfile(link)
+                os.startfile(link)  # type: ignore
             elif platform.system().lower() == "darwin":
                 subprocess.call(("open", link))
             else:
@@ -1802,7 +1809,7 @@ class View(utils.SubjectMixin):
 
         del self.text_tags_search[:]
 
-        st = self.notes_list_model.match_regexp
+        st = self.notes_list_model.match_regexps
         if not st:
             return
 
@@ -1860,13 +1867,13 @@ class View(utils.SubjectMixin):
             # Any Match in Group 0 is a Note Link
             if mo.groups()[0] is not None:
                 link = mo.groups()[0]
-                ul = 0
+                ul = False
             else:
                 link = list(filter(None, mo.groups()))[0]
-                ul = 1
+                ul = True
 
             # Disable underline if user chooses to
-            ul = 0 if not self.config.underline_urls else ul
+            ul = False if not self.config.underline_urls else ul
 
             # Create a new Tkinter Tag
             tag = "web-%d" % (len(self.text_tags_links),)
@@ -2027,7 +2034,7 @@ class View(utils.SubjectMixin):
         self.search_entry.focus()
         self.search_entry.selection_range(0, tk.END)
 
-    def set_cs(self, cs, silent=False):
+    def set_cs(self, cs: str, silent=False):
         if silent:
             self.mute("change:cs")
 

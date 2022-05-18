@@ -80,8 +80,8 @@ else:
     )
 
 try:
-    import docutils
-    import docutils.core
+    import docutils  # type:ignore
+    import docutils.core  # type:ignore
 except ImportError:
     HAVE_DOCUTILS = False
 else:
@@ -364,11 +364,19 @@ class NotesListModel(SubjectMixin):
         SubjectMixin.__init__(self)
 
         self.list = []
-        self.match_regexps = []
+        self._match_regexps = []
 
     def set_list(self, alist):
         self.list = alist
         self.notify_observers("set:list", None)
+
+    @property
+    def match_regexps(self):
+        return self._match_regexps
+
+    @match_regexps.setter
+    def match_regexps(self, val):
+        self._match_regexps = val
 
     def get_idx(self, key):
         """Find idx for passed LOCAL key."""
@@ -506,7 +514,7 @@ class Controller:
             nn, match_regexp, active_notes = self.notes_db.filter_notes()
             # this will trigger the list_change event
             self.notes_list_model.set_list(nn)
-            self.notes_list_model.match_regexp = match_regexp
+            self.notes_list_model.match_regexps = match_regexp
             self.view.set_note_tally(len(nn), active_notes, len(self.notes_db.notes))
 
             # we'll use this to keep track of the currently selected note
@@ -574,7 +582,7 @@ class Controller:
         except Exception as e:
             crash_log = "".join(traceback.format_exception(*evt.exc_info))
             logging.error(crash_log)
-            emsg = "An unexpected error has occurred.\n" "Please check nvpy.log.\n" + repr(e)
+            emsg = "An unexpected error has occurred.\nPlease check nvpy.log.\n" + repr(e)
             self.view.show_error("Sync error", emsg)
             exit(1)
 
@@ -651,18 +659,17 @@ class Controller:
             logging.debug("Trying to convert %s to html." % (key,))
             if HAVE_MARKDOWN:
                 logging.debug("Convert note %s to html." % (key,))
-                exts = re.split("\s+", self.config.md_extensions.strip()) if self.config.md_extensions else []
+                exts = re.split(r"\s+", self.config.md_extensions.strip()) if self.config.md_extensions else []
                 exts += list(DEFAULT_MARKDOWN_EXTS)
                 # remove duplicate items on exts.
                 exts = list(set(exts))
 
                 html = markdown.markdown(c, extensions=exts)
                 logging.debug("Convert done.")
+                css = """"""
                 if self.config.md_css_path:
                     css = """<link rel="stylesheet" href="%s">""" % (self.config.md_css_path,)
                     html = """<div class="markdown-body">%s</div>""" % (html,)
-                else:
-                    css = """"""
 
             else:
                 logging.debug("Markdown not installed.")
@@ -685,7 +692,7 @@ class Controller:
 </html>
             """ % (
                 '<meta http-equiv="refresh" content="5">' if self.view.get_continuous_rendering() else "",
-                css if self.config.md_css_path else "",
+                css if self.config.md_css_path else "",  # type: ignore
                 html,
             )
             f.write(s)
@@ -728,15 +735,17 @@ class Controller:
 
     def observer_view_markdown(self, view, evt_type, evt):
         fn = self.helper_markdown_to_html()
-        # turn filename into URI (mac wants this)
-        fn_uri = "file://" + os.path.abspath(fn)
-        webbrowser.open(fn_uri)
+        if fn:
+            # turn filename into URI (mac wants this)
+            fn_uri = "file://" + os.path.abspath(fn)
+            webbrowser.open(fn_uri)
 
     def observer_view_rest(self, view, evt_type, evt):
         fn = self.helper_rest_to_html()
-        # turn filename into URI (mac wants this)
-        fn_uri = "file://" + os.path.abspath(fn)
-        webbrowser.open(fn_uri)
+        if fn:
+            # turn filename into URI (mac wants this)
+            fn_uri = "file://" + os.path.abspath(fn)
+            webbrowser.open(fn_uri)
 
     def helper_save_sync_msg(self):
 
@@ -811,7 +820,7 @@ class Controller:
         # and set it in the notes_list_model
         nn, match_regexp, active_notes = self.notes_db.filter_notes(evt.value)
         self.notes_list_model.set_list(nn)
-        self.notes_list_model.match_regexp = match_regexp
+        self.notes_list_model.match_regexps = match_regexp
         self.view.set_note_tally(len(nn), active_notes, len(self.notes_db.notes))
 
         idx = self.notes_list_model.get_idx(k)
@@ -860,14 +869,16 @@ class Controller:
         self.view.cmd_notes_list_select()
 
     def observer_view_add_tag(self, view, evt_type, evt: events.TagsAddedEvent):
-        self.notes_db.add_note_tags(self.selected_note_key, evt.tags)
+        comma_separated_tags = ",".join(evt.tags)
+        self.notes_db.add_note_tags(self.selected_note_key, comma_separated_tags)
         self.view.cmd_notes_list_select()
         self.view.tags_entry_var.set("")
 
     def observer_view_change_pinned(self, view, evt_type, evt: events.CheckboxChangedEvent):
         # get new text and update our database
         if self.selected_note_key:
-            self.notes_db.set_note_pinned(self.selected_note_key, evt.value)
+            evt_val_int = int(evt.value)
+            self.notes_db.set_note_pinned(self.selected_note_key, evt_val_int)
 
     def observer_view_change_sort_mode(self, view, evt_type, evt: events.SortModeChangedEvent):
         self.config.sort_mode = self.SORT_MODES[evt.mode].value
@@ -966,10 +977,10 @@ class Controller:
 
 def get_appdir():
     # setup appdir
-    if hasattr(sys, "frozen") and sys.frozen:
+    if hasattr(sys, "frozen") and sys.frozen:  # type: ignore
         if hasattr(sys, "_MEIPASS"):
             # PyInstaller
-            appdir = sys._MEIPASS
+            appdir = sys._MEIPASS  # type: ignore
 
             # WORKAROUND: Bug that always raise the SSLCertVerificationError from urlopen()
             #             when CPython is not installed.
@@ -981,7 +992,7 @@ def get_appdir():
             if ssl.get_default_verify_paths().cafile is None:
                 import certifi
 
-                os.environ["SSL_CERT_FILE"] = certifi.core.where()
+                os.environ["SSL_CERT_FILE"] = certifi.core.where()  # type: ignore
         else:
             # py2exe
             appdir, _ = os.path.split(sys.executable)
