@@ -13,6 +13,7 @@ from . import utils
 import threading
 from . import events
 import typing
+from typing import List, Tuple
 import subprocess
 import platform
 
@@ -119,6 +120,20 @@ class RedirectedText(tk.Text):
     def new_delete(self, *args):
         self.orig_delete(*args)
         self.event_generate("<<Change>>")
+
+    # Convenience methods
+    #######################
+
+    @property
+    def cursor_pos(self) -> Tuple[int, int]:
+        """Get position of the cursor. Represented as (line, column)."""
+        line, col = self.index("insert").split(".")
+        return (int(line), int(col))
+
+    def get_current_line(self) -> str:
+        """Get current line text. Newline char not included."""
+        start, end = self.index("insert linestart"), self.index("insert lineend")
+        return self.get(start, end)
 
 
 class HelpBindings(tk.Toplevel):
@@ -847,144 +862,122 @@ class TriggeredcompleteEntry(tk.Entry):
                 self.cycle = 1
 
 
-class TriggeredcompleteText(RedirectedText):
+class NoteText(RedirectedText):
     """
-    TriggeredcompleteText completes the note title when I press "[[".
-    This class behaves like the TriggeredcompleteEntry.
+    NoteText is tk.Text widget with ability to complete note title when
+    completion mark "[[" is found to the left of the cursor position.
+
+    Keybindings:
+        Ctrl-space: start completion or select next candidate
+        Return or Right arrow: confirm completion
     """
 
-    def __init__(self, master, case_sensitive, **kwargs):
+    def __init__(self, master, case_sensitive: int, **kwargs):
         RedirectedText.__init__(self, master, **kwargs)
-        self.case_sensitive = case_sensitive
-        # make sure we're initialised, else the event handler could generate
-        # exceptions checking for instance variables that don't exist yet.
-        self.set_completion_list([])
+        self.case_sensitive: bool = case_sensitive == 1
+        self._completion_list = []
+        self.cycle = False  # variable indicating whether we're in completion mode
+
         self.bind("<KeyRelease>", self.handle_keyrelease)
+        self.bind("<KeyPress>", self.handle_keypress)
+        self.bind("<Button-1>", lambda _: self._end_complete())
 
-        self.old_cursor_pos = 0
-        self.old_content = ""
+    def set_completion_list(self, completion_list: List[str]) -> None:
+        if completion_list != self._completion_list:
+            self._completion_list = completion_list
+            self._hits = []
+            self._hit_index = 0
+            self.cycle = False
 
-    def set_completion_list(self, completion_list):
-        self._completion_list = completion_list
-        self._hits = []
-        self._hit_index = 0
-        self.cycle = 0
-        self.comp_word_start = None
-        self.comp_word_end = None
-
-    def triggeredcomplete(self):
-        """triggeredcomplete the Entry, delta may be 0/1 to cycle through possible hits"""
-        try:
-            first_index = "1.0"
-            current_line = self.get(first_index, tk.INSERT).splitlines()[-1]
-            current_line += self.get(tk.INSERT, tk.END).splitlines()[0]
-            line, cur_col = self.index(tk.INSERT).split(".")
-            cur_col = int(cur_col)
-
-            word_start = current_line.rindex("[[", 0, int(cur_col)) + 2
-            try:
-                word_end = current_line.index("]]", word_start) + 2
-                word_prefix_end = word_end
-                if word_end < cur_col:
-                    # cursor position is outside the link string like "[[...]]".
-                    return
-                elif word_end - 2 < cur_col:
-                    # cursor position is upon "]]".
-                    word_prefix_end = word_end - 2
-
-                if self.cycle:
-                    word_prefix_end = int(self.cursor_index.split(".")[1])
-            except ValueError:
-                # "]]" is not found. word_end overwrites the cursor position.
-                word_prefix_end = cur_col
-                word_end = cur_col
-
-            bow_index = "%s.%s" % (line, str(word_start))  # index of beginning of word
-            eowp_index = "%s.%s" % (line, str(word_prefix_end))  # index of ending of word_prefix
-            eow_index = "%s.%s" % (line, str(word_end))  # index of ending of word
-
-            word_prefix = current_line[word_start:word_prefix_end].rstrip("]]")
-            word = current_line[word_start:word_end].rstrip("]]")
-        except IndexError:
-            # when press "ctrl+space" key on empty note, will be occur IndexError.
+    def triggeredcomplete(self) -> None:
+        """
+        Complete the entry and save positions of completed word
+        for the next call.
+        """
+        current_line = self.get_current_line()
+        line, cur_col = self.cursor_pos
+        open_bracket_pos = current_line.rfind("[[", 0, cur_col)
+        if open_bracket_pos == -1:
+            # completion marker not found
             return
-        except ValueError:
-            # when press "ctrl+space" key on a line not including of "[[", str.index() will be occur ValueError.
-            return
+
+        word_start = open_bracket_pos + 2
 
         if self.cycle:
             self._hit_index += 1
             if self._hit_index == len(self._hits):
                 self._hit_index = 0
+        else:
+            word_prefix_end = cur_col
+            word_end = cur_col
+            close_bracket_pos = current_line.find("]]", word_start)
+            if close_bracket_pos != -1:
+                # when closing brackets are found include them in word_end
+                # but not in word_prefix_end
+                word_end = close_bracket_pos + 2
+                if word_end < cur_col:
+                    # cursor position is outside the link string "[[...]]".
+                    return
+                if word_end - 2 < cur_col:
+                    # cursor position is upon "]]".
+                    word_prefix_end = word_end - 2
 
-        else:  # set position to end so selection starts where textentry ended
-            self.cursor_index = eowp_index
-            self.comp_word_start = bow_index
-            self.comp_word_end = eow_index
+            self.cursor_index = "%d.%d" % (line, word_prefix_end)
+            self.word_start_index = "%d.%d" % (line, word_start)
+            self.word_end_index = "%d.%d" % (line, word_end)
 
             # collect hits
-            hits = []
-            for element in self._completion_list:
-                if self.case_sensitive == 0:
-                    if element.lower().startswith(word_prefix.lower()):
-                        hits.append(element)
-                else:
-                    if element.startswith(word_prefix):
+            if word_start == word_prefix_end:
+                # prefix is emty string
+                hits = self._completion_list[:]
+            else:
+                hits = []
+                word_prefix = current_line[word_start:word_prefix_end]
+                word_prefix = word_prefix if self.case_sensitive else word_prefix.lower()
+                for element in self._completion_list:
+                    el = element if self.case_sensitive else element.lower()
+                    if el.startswith(word_prefix):
                         hits.append(element)
 
             self._hit_index = 0
             self._hits = hits
 
-        # now finally perform the triggered completion
+        # perform the completion
         if self._hits:
             new_word = self._hits[self._hit_index] + "]]"
-            new_eow_index = "%s.%s" % (line, word_start + len(new_word))  # index of ending of word
+            new_eow_index = "%d.%d" % (line, word_start + len(new_word))
 
-            self.delete(self.comp_word_start, self.comp_word_end)
-            self.insert(bow_index, new_word)
+            self.delete(self.word_start_index, self.word_end_index)
+            self.insert(self.word_start_index, new_word)
             self.tag_add("sel", self.cursor_index, new_eow_index)
 
-            self.comp_word_start = bow_index
-            self.comp_word_end = new_eow_index
+            self.word_end_index = new_eow_index
+
+    def _end_complete(self):
+        self.cycle = False
+        self.selection_clear()
+
+    def handle_keypress(self, event):
+        if self.cycle:
+            if event.keysym in ("Return", "Right"):
+                self._end_complete()
+                return "break"
 
     def handle_keyrelease(self, event):
-        """event handler for the keyrelease event on this widget"""
         ctrl = (event.state & 0x0004) != 0
 
-        # special case handling below only if we are in cycle mode.
-        if self.cycle:
-            if event.keysym == "BackSpace":
-                self.cycle = 0
-                return
-
-            if event.keysym in ("Right", "Return"):
-                self.cycle = 0
-                if event.keysym == "Return":
-                    # restore content
-                    self.delete("1.0", tk.END)
-                    self.insert("1.0", self.old_content)
-                # restore cursor position
-                self.mark_set("insert", self.old_cursor_pos)
-                return
-
         if event.keysym == "space" and ctrl:
-            # cycle
+            # perform completion
             self.triggeredcomplete()
-            if self.cycle == 0:
-                self.cycle = 1
-            self.old_cursor_pos = self.index(tk.INSERT)
-            self.old_content = self.get("1.0", tk.END)
+            self.cycle = True
+            return "break"
+
+        # releasing Ctrl should not break cycle
+        if event.keysym in ("Control_L", "Control_R"):
             return
 
-        cursor_pos = self.index(tk.INSERT)
-        content = self.get("1.0", tk.END)
-        if self.old_cursor_pos == cursor_pos and self.old_content == content:
-            # ignore
-            return
-        self.old_cursor_pos = cursor_pos
-        self.old_content = content
-        # other keys pressed
-        self.cycle = 0
+        # other key pressed
+        self.cycle = False
 
 
 class View(utils.SubjectMixin):
@@ -1551,7 +1544,7 @@ class View(utils.SubjectMixin):
             f = tkFont.Font(family=self.config.font_family, size=self.config.font_size)
             # tkFont.families(root) returns list of available font family names
             # this determines the width of the complete interface (yes)
-            text = TriggeredcompleteText(
+            text = NoteText(
                 master,
                 self.config.case_sensitive,
                 height=25,
