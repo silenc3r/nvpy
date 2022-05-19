@@ -1,5 +1,5 @@
 import unittest
-from mock import Mock
+from mock import Mock  # type: ignore
 from nvpy.view import View
 from nvpy.nvpy import NotesListModel
 from nvpy.nvpy import Config

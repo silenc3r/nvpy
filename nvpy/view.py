@@ -13,9 +13,10 @@ from . import utils
 import threading
 from . import events
 import typing
-from typing import List, Tuple
+from typing import Any, List, Optional, Set, Tuple
 import subprocess
 import platform
+from .notes_db import Note
 
 
 class WidgetRedirector:
@@ -192,7 +193,7 @@ class SuggestionEntry(tk.Entry):
         self.orig_bind("<FocusIn>", self.showSuggestions)
         self.orig_bind("<FocusOut>", self.hideSuggestions)
 
-    def new_bind(self, sequence=None, func=None, add=None):
+    def new_bind(self, sequence=None, func=Any, add=None):
         """
         Hijack key bindings
         """
@@ -875,7 +876,7 @@ class NoteText(RedirectedText):
     def __init__(self, master, case_sensitive: int, **kwargs):
         RedirectedText.__init__(self, master, **kwargs)
         self.case_sensitive: bool = case_sensitive == 1
-        self._completion_list = []
+        self._completion_list: List[str] = []
         self.cycle = False  # variable indicating whether we're in completion mode
 
         self.bind("<KeyRelease>", self.handle_keyrelease)
@@ -885,7 +886,7 @@ class NoteText(RedirectedText):
     def set_completion_list(self, completion_list: List[str]) -> None:
         if completion_list != self._completion_list:
             self._completion_list = completion_list
-            self._hits = []
+            self._hits: List[str] = []
             self._hit_index = 0
             self.cycle = False
 
@@ -993,7 +994,7 @@ class View(utils.SubjectMixin):
         notes_list_model.add_observer("set:list", self.observer_notes_list)
         self.notes_list_model = notes_list_model
         self.timer_ids_lock = threading.Lock()
-        self.timer_ids: typing.Set[typing.Any] = set()
+        self.timer_ids: Set[Any] = set()
 
         tk.Tk.report_callback_exception = self.handle_unexpected_error
         self._create_ui()
@@ -1003,8 +1004,8 @@ class View(utils.SubjectMixin):
         # on Windows, tkinter uses system dialogs in any case
         self.root.option_add("*Dialog.msg.font", "Helvetica 12")
 
-        self.text_tags_links: typing.List[str] = []
-        self.text_tags_search: typing.List[str] = []
+        self.text_tags_links: List[str] = []
+        self.text_tags_search: List[str] = []
 
         self.search_entry.focus_set()
 
@@ -1972,6 +1973,7 @@ class View(utils.SubjectMixin):
         self.activate_links()
         self.activate_search_string_highlights()
         self.activate_markdown_highlighting()
+        return "break"
 
     def handler_text_copy(self, event):
         first = self.text_note.index("sel.first")
@@ -2053,10 +2055,10 @@ class View(utils.SubjectMixin):
     def set_status_text(self, txt):
         self.statusbar.set_status(txt)
 
-    def handler_delete_tag_from_selected_note(self, tag_name):
+    def handler_delete_tag_from_selected_note(self, tag_name: str):
         self.notify_observers("delete:tag", events.TagRemovedEvent(tag=tag_name))
 
-    def set_note_data(self, note, reset_undo=True, content_unchanged=False):
+    def set_note_data(self, note: Optional[Note], reset_undo=True, content_unchanged=False):
         """Replace text in editor with content.
 
         This is usually called when a new note is selected (case 1), or
@@ -2067,6 +2069,7 @@ class View(utils.SubjectMixin):
         @param content_unchanged: Set to True if you know that the content
         has not changed, only the tags and pinned status.
         """
+        tags: List[str]
 
         if not content_unchanged:
             self.text_note.delete(1.0, tk.END)  # clear all
@@ -2091,7 +2094,7 @@ class View(utils.SubjectMixin):
                 self.note_existing_tags_frame,
                 width=0,
                 text=tag + " x",
-                command=lambda tag=tag: self.handler_delete_tag_from_selected_note(tag),
+                command=lambda tag=tag: self.handler_delete_tag_from_selected_note(tag),  # type: ignore
             )
             tag_button.pack(side=tk.LEFT)
 

@@ -171,9 +171,9 @@ class UpdateNoteToServer(PatchedDBMixin, unittest.TestCase):
         self.assertEqual(note, old_note)
 
     def test_fail_1(self):
-        local_note = {"key": "remote_key", "content": "foo", "savedate": 2, "syncdate": 5}
-        remote_note = {"key": "remote_key", "content": "bar"}
-        note = local_note.copy()
+        local_note = Note({"key": "remote_key", "content": "foo", "savedate": 2, "syncdate": 5})
+        remote_note = Note({"key": "remote_key", "content": "bar"})
+        note = Note(local_note.copy())
         update_err = OSError("connection refused")
 
         db = self._patched_db(
@@ -187,7 +187,7 @@ class UpdateNoteToServer(PatchedDBMixin, unittest.TestCase):
     def test_failure_recovery_1(self):
         local_note = {"key": "remote_key", "content": "foo", "savedate": 2, "syncdate": 5}
         remote_note = {"key": "remote_key", "content": "foo"}
-        note = local_note.copy()
+        note = Note(local_note.copy())
         update_err = OSError("400 bad request")
 
         db = self._patched_db(
@@ -274,7 +274,7 @@ class SyncNoteUnthreaded(PatchedDBMixin, unittest.TestCase):
         }
         db = self._patched_db(se_update_note=((updated_remote_note, 0),))
         db.notes = {
-            key: local_note,
+            key: Note(local_note),
         }
         with patch("time.time", side_effect=itertools.repeat(99)):
             result = db.sync_note_unthreaded(key)
@@ -302,7 +302,7 @@ class SyncNoteUnthreaded(PatchedDBMixin, unittest.TestCase):
         )
         db = self._patched_db(se_update_note_to_server=(update_result,))
         db.notes = {
-            key: local_note.copy(),
+            key: Note(local_note.copy()),
         }
         result = db.sync_note_unthreaded(key)
         self.assertIsNone(result)
@@ -315,28 +315,34 @@ class SyncNoteUnthreaded(PatchedDBMixin, unittest.TestCase):
 
     def test_update_2(self):
         key = "KEY"
-        local_note = {
-            "key": key,
-            "content": "this note is old",
-            "modifydate": 1,
-            "savedate": 2,
-            "syncdate": 3,
-        }
-        remote_note = {
-            "key": key,
-            "content": "this note is latest",
-            "modifydate": 90,
-        }
-        expected_note = {
-            "key": key,
-            "content": "this note is latest",
-            "modifydate": 90,
-            "savedate": 2,
-            "syncdate": 99,
-        }
+        local_note = Note(
+            {
+                "key": key,
+                "content": "this note is old",
+                "modifydate": 1,
+                "savedate": 2,
+                "syncdate": 3,
+            }
+        )
+        remote_note = Note(
+            {
+                "key": key,
+                "content": "this note is latest",
+                "modifydate": 90,
+            }
+        )
+        expected_note = Note(
+            {
+                "key": key,
+                "content": "this note is latest",
+                "modifydate": 90,
+                "savedate": 2,
+                "syncdate": 99,
+            }
+        )
         db = self._patched_db(se_get_note=((remote_note, 0),))
         db.notes = {
-            key: local_note.copy(),
+            key: Note(local_note.copy()),
         }
         with patch("time.time", side_effect=itertools.repeat(99)):
             result = db.sync_note_unthreaded(key)
@@ -350,22 +356,26 @@ class SyncNoteUnthreaded(PatchedDBMixin, unittest.TestCase):
 
     def test_no_update(self):
         key = "KEY"
-        local_note = {
-            "key": key,
-            "content": "this note is old",
-            "modifydate": 1,
-            "savedate": 2,
-            "syncdate": 3,
-        }
-        remote_note = {
-            "key": key,
-            "content": "this note is latest",
-            "modifydate": 1,
-        }
-        expected_note = local_note
+        local_note = Note(
+            {
+                "key": key,
+                "content": "this note is old",
+                "modifydate": 1,
+                "savedate": 2,
+                "syncdate": 3,
+            }
+        )
+        remote_note = Note(
+            {
+                "key": key,
+                "content": "this note is latest",
+                "modifydate": 1,
+            }
+        )
+        expected_note = Note(local_note)
         db = self._patched_db(se_get_note=((remote_note, 0),))
         db.notes = {
-            key: local_note.copy(),
+            key: Note(local_note.copy()),
         }
         result = db.sync_note_unthreaded(key)
         self.assertEqual(result, (key, False))
@@ -389,7 +399,7 @@ class SyncNoteUnthreaded(PatchedDBMixin, unittest.TestCase):
         expected_note = local_note
         db = self._patched_db(se_get_note=((get_note_err, 1),))
         db.notes = {
-            key: local_note.copy(),
+            key: Note(local_note.copy()),
         }
         result = db.sync_note_unthreaded(key)
         self.assertIsNone(result)
@@ -661,7 +671,7 @@ class SaveThreaded(PatchedDBMixin, unittest.TestCase):
     def test_save_a_note(self):
         db = self._patched_db()
         db.notes = {
-            "a": self.NOTE.copy(),
+            "a": Note(self.NOTE.copy()),
         }
         self.assertTrue(Note(db.notes["a"]).need_save)
         with patch("time.time", side_effect=itertools.repeat(99)):

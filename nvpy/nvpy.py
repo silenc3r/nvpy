@@ -127,7 +127,7 @@ class Config:
 
         # the file that we write user settings to, which is different
         # from the configuration files
-        self.settings_file = os.path.join(home, ".nvpy_settings")
+        self.settings_file = pathlib.Path(home) / ".nvpy_settings"
         if is_linux:
             env_dir = os.environ.get("XDG_CACHE_HOME")
             cache_dir = pathlib.Path(env_dir) if env_dir and os.path.isabs(env_dir) else pathlib.Path.home() / ".cache"
@@ -990,7 +990,7 @@ def get_appdir():
             import ssl
 
             if ssl.get_default_verify_paths().cafile is None:
-                import certifi
+                import certifi  # type: ignore
 
                 os.environ["SSL_CERT_FILE"] = certifi.core.where()  # type: ignore
         else:

@@ -12,6 +12,7 @@ import enum
 import abc
 import unicodedata
 import pathlib
+from pathlib import Path
 import threading
 from queue import Queue, Empty
 from http.client import HTTPException
@@ -19,6 +20,7 @@ from .p3port import unicode
 from threading import Thread, Lock
 import time
 import typing
+from typing import Any, Dict, List, Optional, Tuple
 import re
 import base64
 import simplenote  # type:ignore
@@ -26,7 +28,51 @@ from . import events
 from . import utils
 from .debug import wrap_buggy_function
 
-FilterResult = typing.Tuple[typing.List["NoteInfo"], str, int]
+FilterResult = Tuple[List["NoteInfo"], str, int]
+
+
+class Note(dict):
+    @property
+    def need_save(self):
+        """Check if the local note need to save."""
+        savedate = float(self["savedate"])
+        return float(self["modifydate"]) > savedate or float(self["syncdate"]) > savedate
+
+    @property
+    def need_sync_to_server(self):
+        """Check if the local note need to synchronize to the server.
+
+        Return True when it has not key or it has been modified since last sync.
+        """
+        return "key" not in self or float(self["modifydate"]) > float(self["syncdate"])
+
+    def is_newer_than(self, other):
+        try:
+            return float(self["modifydate"]) > float(other["modifydate"])
+        except KeyError:
+            return self["version"] > other["version"]
+
+    def is_identical(self, other) -> bool:
+        this_note = dict(self)
+        other_note = dict(other)
+
+        this_note["savedate"] = 0
+        this_note["syncdate"] = 0
+        other_note["savedate"] = 0
+        other_note["syncdate"] = 0
+
+        # convert to hashable objects.
+        for k, v in this_note.items():
+            if isinstance(v, list):
+                this_note[k] = tuple(v)
+        for k, v in other_note.items():
+            if isinstance(v, list):
+                other_note[k] = tuple(v)
+
+        # should be an empty set when they're identical.
+        difference = set(this_note.items()) ^ set(other_note.items())
+        return len(difference) == 0
+
 
 # API key provided for nvPY.
 # Please do not use for other software!
@@ -35,33 +81,44 @@ simplenote.simplenote.API_KEY = bytes(reversed(base64.b64decode("OTg0OTI4ZTg4YjY
 
 # workaround for https://github.com/cpbotha/nvpy/issues/191
 class Simplenote(simplenote.Simplenote):
-    def get_token(self):
+    token: Optional[str]
+
+    def get_token(self) -> str:
         if self.token is None:
             self.token = self.authenticate(self.username, self.password)
             if self.token is None:
                 raise HTTPException("failed to connect to the server")
         try:
-            return str(self.token, "utf-8")
+            return str(self.token, "utf-8")  # type: ignore
         except TypeError:
             return self.token
 
     def get_note(self, *args, **kwargs):
         try:
-            return super().get_note(*args, **kwargs)
+            res, status = super().get_note(*args, **kwargs)
         except HTTPException as e:
-            return e, -1
+            res, status = e, -1
+        if status == 0:
+            res = Note(res)
+        return res, status
 
     def update_note(self, *args, **kwargs):
         try:
-            return super().update_note(*args, **kwargs)
+            res, status = super().update_note(*args, **kwargs)
         except HTTPException as e:
-            return e, -1
+            res, status = e, -1
+        if status == 0:
+            res = Note(res)
+        return res, status
 
     def get_note_list(self, *args, **kwargs):
         try:
-            return super().get_note_list(*args, **kwargs)
+            res, status = super().get_note_list(*args, **kwargs)
         except HTTPException as e:
-            return e, -1
+            res, status = e, -1
+        if status == 0:
+            res = [Note(n) for n in res]  # type: ignore
+        return res, status
 
 
 ACTION_SAVE = 0
@@ -308,104 +365,10 @@ class NotesDB(utils.SubjectMixin):
 
         self.config = config
 
-        # create db dir if it does not exist
-        if not os.path.exists(config.db_path):
-            os.mkdir(config.db_path)
+        self.store = FileStore(self.config)
 
-        self.db_path = config.db_path
-
-        # create txt Notes dir if it does not exist
-        if self.config.notes_as_txt and not os.path.exists(config.txt_path):
-            os.mkdir(config.txt_path)
-
-        now = time.time()
-        # now read all .json files from disk
-        fnlist = glob.glob(self.helper_key_to_fname("*"))
-        txtlist = []
-
-        for ext in config.read_txt_extensions.split(","):
-            txtlist += glob.glob(self.config.txt_path + "/*." + ext)
-
-        # removing json files and force full full sync if using text files
-        # and none exists and json files are there
-        if self.config.notes_as_txt and not txtlist and fnlist:
-            logging.debug("Forcing resync: using text notes, first usage")
-            for fn in fnlist:
-                os.unlink(fn)
-            fnlist = []
-
-        self.notes = {}
+        self.notes: Dict[str, Note] = self.store.load_notes()
         self.notes_lock = threading.Lock()
-
-        if self.config.notes_as_txt:
-            self.titlelist = {}
-
-        for fn in fnlist:
-            try:
-                with open(fn, "rb") as f:
-                    n = json.load(f)
-                if self.config.notes_as_txt:
-                    nt = utils.get_note_title_file(n, self.config.replace_filename_spaces)
-                    tfn = os.path.join(self.config.txt_path, nt)
-                    if os.path.isfile(tfn):
-                        self.titlelist[n.get("key")] = nt
-                        txtlist.remove(tfn)
-                        if os.path.getmtime(tfn) > os.path.getmtime(fn):
-                            logging.debug("Text note was changed: %s" % (fn,))
-                            with codecs.open(tfn, mode="rb", encoding="utf-8") as f:
-                                c = f.read()
-
-                            n["content"] = c
-                            n["modifydate"] = os.path.getmtime(tfn)
-                    else:
-                        logging.debug("Deleting note : %s" % (fn,))
-                        if not self.config.simplenote_sync:
-                            os.unlink(fn)
-                            continue
-                        else:
-                            n["deleted"] = 1
-                            n["modifydate"] = now
-
-            except IOError as e:
-                logging.error("NotesDB_init: Error opening %s: %s" % (fn, str(e)))
-                raise ReadError("Error opening note file")
-
-            except ValueError as e:
-                logging.error("NotesDB_init: Error reading %s: %s" % (fn, str(e)))
-                raise ReadError("Error reading note file")
-
-            else:
-                # we always have a localkey, also when we don't have a note['key'] yet (no sync)
-                localkey = os.path.splitext(os.path.basename(fn))[0]
-                self.notes[localkey] = n
-                # we maintain in memory a timestamp of the last save
-                # these notes have just been read, so at this moment
-                # they're in sync with the disc.
-                n["savedate"] = now
-
-        if self.config.notes_as_txt:
-            for fn in txtlist:
-                logging.debug("New text note found : %s" % (fn,))
-                tfn = os.path.join(self.config.txt_path, fn)
-                try:
-                    with codecs.open(tfn, mode="rb", encoding="utf-8") as f:
-                        c = f.read()
-
-                except IOError as e:
-                    logging.error("NotesDB_init: Error opening %s: %s" % (fn, str(e)))
-                    raise ReadError("Error opening note file")
-
-                except ValueError as e:
-                    logging.error("NotesDB_init: Error reading %s: %s" % (fn, str(e)))
-                    raise ReadError("Error reading note file")
-
-                else:
-                    nk = self.create_note(c)
-                    nn = os.path.splitext(os.path.basename(fn))[0]
-                    if nn != utils.get_note_title(self.notes[nk]):
-                        self.notes[nk]["content"] = nn + "\n\n" + c
-
-                    os.unlink(tfn)
 
         # save and sync queue
         self.q_save = Queue()
@@ -436,7 +399,7 @@ class NotesDB(utils.SubjectMixin):
             thread_sync.setDaemon(True)
             thread_sync.start()
 
-    def create_note(self, title):
+    def create_note(self, title: str) -> str:
         # need to get a key unique to this database. not really important
         # what it is, as long as it's unique.
         new_key = utils.generate_random_key()
@@ -446,25 +409,27 @@ class NotesDB(utils.SubjectMixin):
         timestamp = time.time()
 
         # note has no internal key yet.
-        new_note = {
-            "content": title,
-            "modifydate": timestamp,
-            "createdate": timestamp,
-            "savedate": 0,  # never been written to disc
-            "syncdate": 0,  # never been synced with server
-            "tags": [],
-        }
+        new_note = Note(
+            {
+                "content": title,
+                "modifydate": timestamp,
+                "createdate": timestamp,
+                "savedate": 0,  # never been written to disc
+                "syncdate": 0,  # never been synced with server
+                "tags": [],
+            }
+        )
 
         self.notes[new_key] = new_note
 
         return new_key
 
-    def delete_note(self, key):
+    def delete_note(self, key: str):
         n = self.notes[key]
         n["deleted"] = 1
         n["modifydate"] = time.time()
 
-    def filter_notes(self, search_string=None) -> FilterResult:
+    def filter_notes(self, search_string: Optional[str] = None) -> FilterResult:
         """Return list of notes filtered with search string.
 
         Based on the search mode that has been selected in self.config,
@@ -487,61 +452,47 @@ class NotesDB(utils.SubjectMixin):
         filtered_notes.sort(key=self.config.sorter)
         return filtered_notes, match_regexp, active_notes
 
-    def _helper_gstyle_tagmatch(self, tag_pats, note):
-        if tag_pats:
-            tags = note.get("tags")
+    def _helper_gstyle_tagmatch(self, tag_pats: List[str], note) -> int:
+        """Check if note matches all tag patterns.
 
-            # tag: patterns specified, but note has no tags, so no match
-            if not tags:
-                return 0
-
-            # for each tag_pat, we have to find a matching tag
-            for tp in tag_pats:
-                # at the first match between tp and a tag:
-                if next((tag for tag in tags if tag.startswith(tp)), None) is not None:
-                    # we found a tag that matches current tagpat, so we move to the next tagpat
-                    continue
-
-                else:
-                    # we found no tag that matches current tagpat, so we break out of for loop
-                    break
-
-            else:
-                # for loop never broke out due to no match for tagpat, so:
-                # all tag_pats could be matched, so note is a go.
-                return 1
-
-            # break out of for loop will have us end up here
-            # for one of the tag_pats we found no matching tag
-            return 0
-
-        else:
+        Return values:
+            0: no match - at least 1 pattern doesn't match
+            1: all patterns match
+            2: match becaus no patterns
+        """
+        if not tag_pats:
             # match because no tag: patterns were specified
             return 2
 
-    def _helper_gstyle_mswordmatch(self, msword_pats, content):
-        """If all words / multi-words in msword_pats are found in the content,
-        the note goes through, otherwise not.
+        tags = note.get("tags")
+        if not tags:
+            # no match because note has no tags
+            return 0
 
-        @param msword_pats:
-        @param content:
-        @return:
-        """
+        # for each tag_pat we have to find a matching tag
+        for tp in tag_pats:
+            matches = [tag for tag in tags if tag.startswith(tp)]
+            if not matches:
+                return 0
+
+        # all patterns match
+        return 1
+
+    def _helper_gstyle_mswordmatch(self, msword_pats: List[str], content: str) -> bool:
+        """Check if all patterns match the content."""
 
         # no search patterns, so note goes through
         if not msword_pats:
             return True
 
-        # search for the first p that does NOT occur in content
-        if next((p for p in msword_pats if p not in content), None) is None:
-            # we only found pats that DO occur in content so note goes through
-            return True
+        for p in msword_pats:
+            if p not in content:
+                return False
 
-        else:
-            # we found the first p that does not occur in content
-            return False
+        # all patterns match
+        return True
 
-    def filter_notes_gstyle(self, search_string=None) -> FilterResult:
+    def filter_notes_gstyle(self, search_string: Optional[str] = None) -> FilterResult:
         filtered_notes = []
         # total number of notes, excluding deleted
         active_notes = 0
@@ -563,8 +514,9 @@ class NotesDB(utils.SubjectMixin):
         # example result for 't:tag1 t:tag2 word1 "word2 word3" tag:tag3' ==
         # [('', 'tag1', '', ''), ('', 'tag2', '', ''), ('', '', '', 'word1'), ('', '', 'word2 word3', ''), ('ag', 'tag3', '', '')]
 
+        # TODO: we should match when only open double-quote is present
         groups = re.findall(r't(ag)?:([^\s]+)|"([^"]+)"|([^\s]+)', search_string)
-        tms_pats: typing.List[typing.List[str]] = [[] for _ in range(3)]
+        tms_pats: List[List[str]] = [[] for _ in range(3)]
 
         # we end up with [[tag_pats],[multi_word_pats],[single_word_pats]]
         for gi in groups:
@@ -572,79 +524,73 @@ class NotesDB(utils.SubjectMixin):
                 if gi[mi]:
                     tms_pats[mi - 1].append(gi[mi])
 
+        tag_patterns = tms_pats[0]
+        word_patterns = tms_pats[1] + tms_pats[2]
+
         with self.notes_lock:
-            for k in self.notes:
-                n = self.notes[k]
+            for k, n in self.notes.items():
+                if n.get("deleted"):
+                    continue
 
-                if not n.get("deleted"):
-                    active_notes += 1
-                    c = n.get("content")
+                active_notes += 1
 
-                    # case insensitive mode: WARNING - SLOW!
-                    if not self.config.case_sensitive and c:
-                        c = c.lower()
+                tagmatch = self._helper_gstyle_tagmatch(tag_patterns, n)
+                if tagmatch == 0:
+                    continue
 
-                    tagmatch = self._helper_gstyle_tagmatch(tms_pats[0], n)
-                    # case insensitive mode: WARNING - SLOW!
-                    msword_pats = (
-                        tms_pats[1] + tms_pats[2]
-                        if self.config.case_sensitive
-                        else [p.lower() for p in tms_pats[1] + tms_pats[2]]
-                    )
-                    if tagmatch and self._helper_gstyle_mswordmatch(msword_pats, c):
-                        # we have a note that can go through!
+                c = n["content"]
+                # case insensitive mode: WARNING - SLOW!
+                if not self.config.case_sensitive and c:
+                    c = c.lower()
+                msword_pats = word_patterns if self.config.case_sensitive else [p.lower() for p in word_patterns]
+                if self._helper_gstyle_mswordmatch(msword_pats, c):
+                    # we have a note that can go through!
 
-                        # tagmatch == 1 if a tag was specced and found
-                        # tagmatch == 2 if no tag was specced (so all notes go through)
-                        tagfound = 1 if tagmatch == 1 else 0
-                        # we have to store our local key also
-                        filtered_notes.append(NoteInfo(key=k, note=n, tagfound=tagfound))
+                    # tagmatch == 1 if a tag was specced and found
+                    # tagmatch == 2 if no tag was specced (so all notes go through)
+                    tagfound = 1 if tagmatch == 1 else 0
+                    # we have to store our local key also
+                    filtered_notes.append(NoteInfo(key=k, note=n, tagfound=tagfound))
 
-        match_regexp = "|".join(re.escape(p) for p in tms_pats[1] + tms_pats[2])
+        match_regexp = "|".join(re.escape(p) for p in word_patterns)
         return filtered_notes, match_regexp, active_notes
 
-    def filter_notes_regexp(self, search_string=None) -> FilterResult:
+    def filter_notes_regexp(self, search_string: Optional[str] = None) -> FilterResult:
         """Return list of notes filtered with search_string,
         a regular expression, each a tuple with (local_key, note).
         """
-
-        sspat: typing.Optional[typing.Pattern]
+        match_regexp = ""
+        sspat = None
         if search_string:
             try:
                 if self.config.case_sensitive == 0:
                     sspat = re.compile(search_string, re.MULTILINE | re.I)
                 else:
                     sspat = re.compile(search_string, re.MULTILINE)
+                match_regexp = search_string
             except re.error:
                 sspat = None
-
-        else:
-            sspat = None
 
         filtered_notes = []
         # total number of notes, excluding deleted ones
         active_notes = 0
         with self.notes_lock:
-            for k in self.notes:
-                n = self.notes[k]
-                # we don't do anything with deleted notes (yet)
+            for k, n in self.notes.items():
                 if n.get("deleted"):
                     continue
 
                 active_notes += 1
 
-                c = n.get("content")
+                c: str = n["content"]
                 if self.config.search_tags == 1:
                     t = n.get("tags")
                     if sspat:
                         if t and any(filter(lambda ti: sspat.search(ti), t)):  # type:ignore
                             # we have to store our local key also
                             filtered_notes.append(NoteInfo(key=k, note=n, tagfound=1))
-
                         elif sspat.search(c):
                             # we have to store our local key also
                             filtered_notes.append(NoteInfo(key=k, note=n, tagfound=0))
-
                     else:
                         # we have to store our local key also
                         filtered_notes.append(NoteInfo(key=k, note=n, tagfound=0))
@@ -653,18 +599,16 @@ class NotesDB(utils.SubjectMixin):
                         # we have to store our local key also
                         filtered_notes.append(NoteInfo(key=k, note=n, tagfound=0))
 
-        match_regexp = search_string if sspat else ""
-
         return filtered_notes, match_regexp, active_notes
 
-    def get_note(self, key):
+    def get_note(self, key: str):
         return self.notes[key]
 
-    def get_note_content(self, key):
+    def get_note_content(self, key: str) -> str:
         with self.notes_lock:
-            return self.notes[key].get("content")
+            return self.notes[key]["content"]
 
-    def get_note_status(self, key):
+    def get_note_status(self, key: str) -> NoteStatus:
         saved, synced, modified = False, False, False
         if key is not None:
             n = self.notes[key]
@@ -688,60 +632,19 @@ class NotesDB(utils.SubjectMixin):
         return self.q_sync.qsize()
 
     def is_worker_busy(self):
+        # XXX: this is only used for tests
         return bool(
             self.q_sync.qsize() or self.syncing_lock.locked() or self.waiting_for_simplenote or self.q_save.qsize()
         )
 
-    def helper_key_to_fname(self, k):
-        return os.path.join(self.db_path, k) + ".json"
-
-    def helper_save_note(self, k, note):
+    def helper_save_note(self, key: str, note: Note):
         """Save a single note to disc."""
-
-        if self.config.notes_as_txt:
-            t = utils.get_note_title_file(note, self.config.replace_filename_spaces)
-            if t and not note.get("deleted"):
-                if k in self.titlelist:
-                    logging.debug("Writing note : %s %s" % (t, self.titlelist[k]))
-                    if self.titlelist[k] != t:
-                        dfn = os.path.join(self.config.txt_path, self.titlelist[k])
-                        if os.path.isfile(dfn):
-                            logging.debug("Delete file %s " % (dfn,))
-                            os.unlink(dfn)
-                        else:
-                            logging.debug("File not exits %s " % (dfn,))
-                else:
-                    logging.debug("Key not in list %s " % (k,))
-
-                self.titlelist[k] = t
-                fn = os.path.join(self.config.txt_path, t)
-                try:
-                    pathlib.Path(fn).write_text(note["content"], encoding="utf-8")
-                except (IOError, ValueError) as e:
-                    logging.error("NotesDB_save: Error writing %s: %s" % (fn, str(e)))
-                    raise WriteError(f"Error writing note file ({fn})")
-
-            elif t and note.get("deleted") and k in self.titlelist:
-                dfn = os.path.join(self.config.txt_path, self.titlelist[k])
-                if os.path.isfile(dfn):
-                    logging.debug("Delete file %s " % (dfn,))
-                    os.unlink(dfn)
-
-        fn = self.helper_key_to_fname(k)
-        if not self.config.simplenote_sync and note.get("deleted"):
-            if os.path.isfile(fn):
-                os.unlink(fn)
-        else:
-            try:
-                pathlib.Path(fn).write_text(json.dumps(note, indent=2), encoding="utf-8")
-            except (IOError, ValueError) as e:
-                logging.error("NotesDB_save: Error opening %s: %s" % (fn, str(e)))
-                raise WriteError(f"Error writing note file ({fn})")
+        self.store.save(key, note)
 
         # record that we saved this to disc.
         note["savedate"] = time.time()
 
-    def sync_note_unthreaded(self, k):
+    def sync_note_unthreaded(self, k: str):
         """Sync a single note with the server.
 
         Update existing note in memory with the returned data.
@@ -750,7 +653,7 @@ class NotesDB(utils.SubjectMixin):
 
         note = self.notes[k]
 
-        if Note(note).need_sync_to_server:
+        if note.need_sync_to_server:
             # update to server
             result = self.update_note_to_server(note)
 
@@ -781,7 +684,7 @@ class NotesDB(utils.SubjectMixin):
             if gret[1] == 0:
                 n = gret[0]
 
-                if Note(n).is_newer_than(note):
+                if n.is_newer_than(note):  # type: ignore
                     n["syncdate"] = time.time()  # type: ignore
                     note.update(n)
                     return (k, True)
@@ -795,7 +698,7 @@ class NotesDB(utils.SubjectMixin):
     def save_threaded(self):
         with self.notes_lock:
             for k, n in self.notes.items():
-                if Note(n).need_save:
+                if n.need_save:
                     cn = copy.deepcopy(n)
                     # put it on my queue as a save
                     o = _BackgroundTask(action=ACTION_SAVE, key=k, note=cn)
@@ -1040,7 +943,7 @@ class NotesDB(utils.SubjectMixin):
 
                     if err == 0:
                         with self.notes_lock:
-                            self.notes[k] = n
+                            self.notes[k] = n  # type: ignore
                             # never been written to disc
                             n["savedate"] = 0  # type: ignore
                             n["syncdate"] = time.time()  # type: ignore
@@ -1057,9 +960,7 @@ class NotesDB(utils.SubjectMixin):
 
             # 5. Clean up local notes.
             for dk in local_deletes.keys():
-                fn = self.helper_key_to_fname(dk)
-                if os.path.exists(fn):
-                    os.unlink(fn)
+                self.store.delete(dk)
 
             self.notify_observers("complete:sync_full", events.SyncCompletedEvent(errors=sync_from_server_errors))
 
@@ -1071,7 +972,7 @@ class NotesDB(utils.SubjectMixin):
             self.full_syncing = False
             self.syncing_lock.release()
 
-    def set_note_content(self, key, content):
+    def set_note_content(self, key: str, content: str):
         n = self.notes[key]
         old_content = n.get("content")
         if content != old_content:
@@ -1079,23 +980,23 @@ class NotesDB(utils.SubjectMixin):
             n["modifydate"] = time.time()
             self.notify_observers("change:note-status", events.NoteStatusChangedEvent(what="modifydate", key=key))
 
-    def delete_note_tag(self, key, tag):
+    def delete_note_tag(self, key: str, tag: str):
         note = self.notes[key]
-        note_tags = note.get("tags")
+        note_tags = list(note["tags"])
         note_tags.remove(tag)
         note["tags"] = note_tags
         note["modifydate"] = time.time()
         self.notify_observers("change:note-status", events.NoteStatusChangedEvent(what="modifydate", key=key))
 
-    def add_note_tags(self, key, comma_separated_tags: str):
+    def add_note_tags(self, key: str, comma_separated_tags: str):
         new_tags = utils.sanitise_tags(comma_separated_tags)
         note = self.notes[key]
-        tags_set = set(note.get("tags")) | set(new_tags)
+        tags_set = set(note["tags"]) | set(new_tags)
         note["tags"] = sorted(tags_set)
         note["modifydate"] = time.time()
         self.notify_observers("change:note-status", events.NoteStatusChangedEvent(what="modifydate", key=key))
 
-    def set_note_pinned(self, key, pinned: int):
+    def set_note_pinned(self, key: str, pinned: int):
         n = self.notes[key]
         old_pinned = utils.note_pinned(n)
         if pinned != old_pinned:
@@ -1113,25 +1014,6 @@ class NotesDB(utils.SubjectMixin):
 
             n["modifydate"] = time.time()
             self.notify_observers("change:note-status", events.NoteStatusChangedEvent(what="modifydate", key=key))
-
-    def is_different_note(self, local_note, remote_note):
-        # for keeping original data.
-        local_note = dict(local_note)
-        remote_note = dict(remote_note)
-
-        del local_note["savedate"]
-        del local_note["syncdate"]
-
-        # convert to hashable objects.
-        for k, v in local_note.items():
-            if isinstance(v, list):
-                local_note[k] = tuple(v)
-        for k, v in remote_note.items():
-            if isinstance(v, list):
-                remote_note[k] = tuple(v)
-
-        # it will returns an empty set() if each notes is equals.
-        return set(local_note.items()) ^ set(remote_note.items())
 
     def worker_save(self):
         while True:
@@ -1251,7 +1133,7 @@ class NotesDB(utils.SubjectMixin):
                 local_note = note
                 remote_note = o
 
-                if not self.is_different_note(local_note, remote_note):
+                if local_note.is_identical(remote_note):
                     # got an error response when updating the note.
                     # however, the remote note has been updated.
                     # this phenomenon is rarely occurs.
@@ -1297,23 +1179,195 @@ class NotesDB(utils.SubjectMixin):
         return UpdateResult(note=None, is_updated=False, error_object=update_error)
 
 
-class Note(dict):
-    @property
-    def need_save(self):
-        """Check if the local note need to save."""
-        savedate = float(self["savedate"])
-        return float(self["modifydate"]) > savedate or float(self["syncdate"]) > savedate
+class FileStore:
+    def __init__(self, config):
+        self.config = config
+        self.db_path = Path(self.config.db_path)
+        if self.config.notes_as_txt:
+            self.titlelist = {}
 
-    @property
-    def need_sync_to_server(self):
-        """Check if the local note need to synchronize to the server.
+        # create db dir if it does not exist
+        if not self.db_path.exists():
+            self.db_path.mkdir()
 
-        Return True when it has not key or it has been modified since last sync.
-        """
-        return "key" not in self or float(self["modifydate"]) > float(self["syncdate"])
+    def load_notes(self):
+        if self.config.notes_as_txt:
+            return self.read_all_txt()
+        else:
+            return self.read_all_json()
 
-    def is_newer_than(self, other):
+    def read_all_json(self) -> Dict[str, Note]:
+        now = time.time()
+        notes = {}
+        fnlist = self.db_path.glob("*.json")
+        for fn in fnlist:
+            localkey = fn.stem
+            with open(fn, "rb") as f:
+                n = Note(json.load(f))
+            n["savedate"] = now
+            notes[localkey] = n
+
+        return notes
+
+    def read_all_txt(self) -> Dict[str, Note]:
+        """Load notes from txt files in really complicated way."""
+
+        # I don't know if this function even works.
+
+        # create txt Notes dir if it does not exist
+        if not os.path.exists(self.config.txt_path):
+            os.mkdir(self.config.txt_path)
+
+        now = time.time()
+        notes = {}
+        fnlist = list(self.db_path.glob("*.json"))
+        txtlist = []
+
+        for ext in self.config.read_txt_extensions.split(","):
+            txtlist += glob.glob(self.config.txt_path + "/*." + ext)
+
+        # removing json files and force full full sync if using text files
+        # and none exists and json files are there
+        if self.config.notes_as_txt and not txtlist and fnlist:
+            logging.debug("Forcing resync: using text notes, first usage")
+            for fn in fnlist:
+                os.unlink(fn)
+            fnlist = []
+
+        for fn in fnlist:
+            try:
+                with open(fn, "rb") as f:
+                    n = Note(json.load(f))
+
+                nt = utils.get_note_title_file(n, self.config.replace_filename_spaces)
+                tfn = os.path.join(self.config.txt_path, nt)
+                if os.path.isfile(tfn):
+                    self.titlelist[n.get("key")] = nt
+                    txtlist.remove(tfn)
+                    if os.path.getmtime(tfn) > os.path.getmtime(fn):
+                        logging.debug("Text note was changed: %s" % (fn,))
+                        with codecs.open(tfn, mode="rb", encoding="utf-8") as f:
+                            c = f.read()
+
+                        n["content"] = c
+                        n["modifydate"] = os.path.getmtime(tfn)
+                else:
+                    logging.debug("Deleting note : %s" % (fn,))
+                    if not self.config.simplenote_sync:
+                        os.unlink(fn)
+                        continue
+                    else:
+                        n["deleted"] = 1
+                        n["modifydate"] = now
+
+            except IOError as e:
+                logging.error("NotesDB_init: Error opening %s: %s" % (fn, str(e)))
+                raise ReadError("Error opening note file")
+
+            except ValueError as e:
+                logging.error("NotesDB_init: Error reading %s: %s" % (fn, str(e)))
+                raise ReadError("Error reading note file")
+
+            else:
+                # we always have a localkey, also when we don't have a note['key'] yet (no sync)
+                localkey = os.path.splitext(os.path.basename(fn))[0]
+                notes[localkey] = n
+                # we maintain in memory a timestamp of the last save
+                # these notes have just been read, so at this moment
+                # they're in sync with the disc.
+                n["savedate"] = now
+
+        for fn in txtlist:
+            logging.debug("New text note found : %s" % (fn,))
+            tfn = os.path.join(self.config.txt_path, fn)
+            try:
+                with codecs.open(tfn, mode="rb", encoding="utf-8") as f:
+                    c = f.read()
+
+            except IOError as e:
+                logging.error("NotesDB_init: Error opening %s: %s" % (fn, str(e)))
+                raise ReadError("Error opening note file")
+
+            except ValueError as e:
+                logging.error("NotesDB_init: Error reading %s: %s" % (fn, str(e)))
+                raise ReadError("Error reading note file")
+
+            else:
+                nk = utils.generate_random_key()
+                while nk in notes:
+                    nk = utils.generate_random_key()
+                new_note = Note(
+                    {
+                        "content": c,
+                        "modifydate": now,
+                        "create": now,
+                        "savedate": 0,
+                        "syncdate": 0,
+                        "tags": [],
+                    }
+                )
+                notes[nk] = new_note
+                nn = os.path.splitext(os.path.basename(fn))[0]
+                if nn != utils.get_note_title(notes[nk]):
+                    notes[nk]["content"] = nn + "\n\n" + c
+
+                os.unlink(tfn)
+
+        return notes
+
+    def save(self, key: str, note: Note):
+        if self.config.notes_as_txt:
+            self.save_txt(key, note)
+        self.save_json(key, note)
+
+    def save_txt(self, key, note):
+        t = utils.get_note_title_file(note, self.config.replace_filename_spaces)
+        if t and not note.get("deleted"):
+            if key in self.titlelist:
+                logging.debug("Writing note : %s %s", t, self.titlelist[key])
+                if self.titlelist[key] != t:
+                    dfn = Path(self.config.txt_path) / self.titlelist[key]
+                    if Path.is_file(dfn):
+                        logging.debug("Delete file %s ", dfn)
+                        dfn.unlink()
+                    else:
+                        logging.debug("File not exits %s ", dfn)
+            else:
+                logging.debug("Key not in list %s ", key)
+
+            self.titlelist[key] = t
+            fn = Path(self.config.txt_path) / t
+            try:
+                fn.write_text(note["content"], encoding="utf-8")
+            except (IOError, ValueError) as e:
+                logging.error("NotesDB_save: Error writing %s: %s", fn, str(e))
+                raise WriteError(f"Error writing note file ({fn})")
+
+        elif t and note.get("deleted") and key in self.titlelist:
+            dfn = Path(self.config.txt_path) / self.titlelist[key]
+            if Path.is_file(dfn):
+                logging.debug("Delete file %s ", dfn)
+                dfn.unlink()
+
+    def save_json(self, key, note):
+        """Write note to disk as json file. This is default note format."""
+        filename = self._key_to_fname(key)
+
+        if not self.config.simplenote_sync and note.get("deleted"):
+            if Path.is_file(filename):
+                filename.unlink()
+            return
+
         try:
-            return float(self["modifydate"]) > float(other["modifydate"])
-        except KeyError:
-            return self["version"] > other["version"]
+            filename.write_text(json.dumps(note, indent=2), encoding="utf-8")
+        except (IOError, ValueError) as e:
+            logging.error("NotesDB_save: Error opening %s: %s", filename, str(e))
+            raise WriteError(f"Error writing note file ({filename})")
+
+    def delete(self, key: str) -> None:
+        fname = self._key_to_fname(key)
+        if fname.exists():
+            fname.unlink()
+
+    def _key_to_fname(self, key: str) -> Path:
+        return self.db_path / (key + ".json")

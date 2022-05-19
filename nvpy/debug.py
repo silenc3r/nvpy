@@ -13,7 +13,7 @@ def format_all_tracebacks():
     output = []
     try:
         for th in threading.enumerate():
-            frame = sys._current_frames()[th.ident]
+            frame = sys._current_frames()[th.ident]  # type: ignore
             stack = traceback.format_stack(frame)
             output.append("Thread(ident={}, name={})\n".format(th.ident, th.name))
             output.extend(stack)

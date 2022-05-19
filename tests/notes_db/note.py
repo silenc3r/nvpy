@@ -33,68 +33,50 @@ class NoteComparators(unittest.TestCase):
         self.assertFalse(b.is_newer_than(b))
         self.assertFalse(b.is_newer_than(c))
 
-
-class NotesDBComparators(DBMixin, unittest.TestCase):
-    def test_is_different_note(self):
-        db = self._db()
-        # If all fields excluding nvPY internal fields are same, those are same.
-        self.assertFalse(
-            db.is_different_note(
-                {
-                    "content": "foo",
-                    "modifydate": 2,
-                    "savedate": 5,  # ignore
-                    "syncdate": 8,  # ignore
-                },
-                {
-                    "content": "foo",
-                    "modifydate": 2,
-                },
-            )
+    def test_is_identical(self):
+        a = Note(
+            {
+                "content": "foo",
+                "modifydate": 2,
+                "savedate": 5,  # ignore
+                "syncdate": 8,  # ignore
+            }
         )
-        # If content is not same, those are different.
-        self.assertTrue(
-            db.is_different_note(
-                {
-                    "content": "foo",
-                    "modifydate": 2,
-                    "savedate": 5,  # ignore
-                    "syncdate": 8,  # ignore
-                },
-                {
-                    "content": "bar",  # changed
-                    "modifydate": 2,
-                },
-            )
+        b = Note(
+            {
+                "content": "foo",
+                "modifydate": 2,
+            }
         )
-        # If other fields excluding nvPY internal fields are not same, those are different.
-        self.assertTrue(
-            db.is_different_note(
-                {
-                    "content": "foo",
-                    "modifydate": 2,
-                    "savedate": 5,  # ignore
-                    "syncdate": 8,  # ignore
-                },
-                {
-                    "content": "foo",
-                    "modifydate": 3,  # changed
-                },
-            )
+        c = Note(
+            {
+                "content": "bar",  # changed
+                "modifydate": 2,
+            }
         )
-        # Must accept non-hashable object like list.
-        self.assertFalse(
-            db.is_different_note(
-                {
-                    "tags": ["a", "b"],
-                    "savedate": 5,  # ignore
-                    "syncdate": 8,  # ignore
-                },
-                {
-                    "tags": ["a", "b"],
-                },
-            )
+        d = Note(
+            {
+                "content": "foo",
+                "modifydate": 3,  # changed
+            }
         )
+        e = Note(
+            {
+                "tags": ["a", "b"],
+                "savedate": 5,  # ignore
+                "syncdate": 8,  # ignore
+            }
+        )
+        f = Note(
+            {
+                "tags": ["a", "b"],
+            }
+        )
+        self.assertTrue(a.is_identical(a))
+        self.assertTrue(a.is_identical(b))
+        self.assertFalse(a.is_identical(c))
+        self.assertFalse(a.is_identical(d))
+        self.assertTrue(e.is_identical(f))
 
 
 class NoteOperations(DBMixin, unittest.TestCase):

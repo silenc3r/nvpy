@@ -17,7 +17,7 @@ from . import tk
 note_title_re = re.compile(r"\s*(.*)\n?")
 
 
-def generate_random_key():
+def generate_random_key() -> str:
     """Generate random 30 digit (15 byte) hex string.
 
     stackoverflow question 2782229
