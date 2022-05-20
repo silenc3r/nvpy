@@ -1218,7 +1218,6 @@ class View(utils.SubjectMixin):
         self.tags_entry.bind("<Escape>", lambda e: self.text_note.focus())
 
         self.search_entry_var.trace("w", self.handler_search_entry)
-        self.cs_checkbutton_var.trace("w", self.handler_cs_checkbutton)
         self.search_mode_var.trace("w", self.handler_search_mode)
         self.pinned_checkbutton_var.trace("w", self.handler_pinned_checkbutton)
         self.sort_mode_var.trace("w", self.handler_sort_mode_change)
@@ -1343,8 +1342,15 @@ class View(utils.SubjectMixin):
         search_menu.add_separator()
 
         self.cs_checkbutton_var = tk.StringVar()
+        self.cs_checkbutton_var.set(self.config.case_sensitive)
 
-        search_menu.add_checkbutton(label="Case sensitive", onvalue="1", offvalue="0", variable=self.cs_checkbutton_var)
+        search_menu.add_checkbutton(
+            label="Case sensitive",
+            onvalue="1",
+            offvalue="0",
+            variable=self.cs_checkbutton_var,
+            command=self.handler_cs_checkbutton,
+        )
 
         # TOOLS ########################################################
         tools_menu = tk.Menu(menu, tearoff=False)
@@ -1425,8 +1431,9 @@ class View(utils.SubjectMixin):
         )
 
         cs_label = tk.Label(search_frame, text="CS ")
-        # self.cs_checkbutton_var = tk.IntVar() # Moved to search menu code area
-        cs_checkbutton = tk.Checkbutton(search_frame, variable=self.cs_checkbutton_var)
+        cs_checkbutton = tk.Checkbutton(
+            search_frame, variable=self.cs_checkbutton_var, command=self.handler_cs_checkbutton
+        )
 
         # self.search_mode_options = ("gstyle", "regexp") # Moved to search menu code area
         # self.search_mode_var = tk.StringVar()
@@ -1713,8 +1720,11 @@ class View(utils.SubjectMixin):
         for f in self.fonts:
             f.configure(size=f["size"] + inc_size)
 
-    def handler_cs_checkbutton(self, *args):
-        self.notify_observers("change:cs", events.CheckboxChangedEvent(value=self.cs_checkbutton_var.get()))
+    def handler_cs_checkbutton(self):
+        value = self.cs_checkbutton_var.get()
+        if value != self.config.case_sensitive:
+            self.config.case_sensitive = value
+            self.refresh_notes_list()
 
     def handler_housekeeper(self):
         try:
@@ -2028,14 +2038,6 @@ class View(utils.SubjectMixin):
     def search(self, e):
         self.search_entry.focus()
         self.search_entry.selection_range(0, tk.END)
-
-    def set_cs(self, cs: str, silent=False):
-        if silent:
-            self.mute("change:cs")
-
-        self.cs_checkbutton_var.set(cs)
-
-        self.unmute("change:cs")
 
     def set_search_mode(self, search_mode, silent=False):
         """

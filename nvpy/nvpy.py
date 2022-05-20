@@ -503,11 +503,9 @@ class Controller:
 
             self.view.add_observer("close", self.observer_view_close)
 
-            # setup UI to reflect our search mode and case sensitivity
-            self.view.set_cs(self.config.case_sensitive, silent=True)
+            # setup UI to reflect our search mode
             self.view.set_search_mode(self.config.search_mode, silent=True)
 
-            self.view.add_observer("change:cs", self.observer_view_change_cs)
             self.view.add_observer("change:search_mode", self.observer_view_change_search_mode)
 
             # nn is a list of (key, note) objects
@@ -800,13 +798,6 @@ class Controller:
 
             elif ret is None:
                 self.view.set_status_text("Unable to sync with server. Offline?")
-
-    def observer_view_change_cs(self, view, evt_type, evt: events.CheckboxChangedEvent):
-        # evt.value is the new value
-        # only do something if user has really toggled
-        if evt.value != self.config.case_sensitive:
-            self.config.case_sensitive = evt.value
-            self.view.refresh_notes_list()
 
     def observer_view_change_search_mode(self, view, evt_type, evt: events.CheckboxChangedEvent):
         if evt.value != self.config.search_mode:
