@@ -6,7 +6,7 @@ authors = ["Charl P. Botha"]
 license = "BSD"
 
 [tool.poetry.dependencies]
-python = "^3.6"
+python = "^3.7"
 Markdown = "*"
 docutils = "*"
 simplenote = "^2.1.4"
@@ -19,6 +19,7 @@ nose = "*"
 nose-timer = "*"
 mypy = "*"
 coverage = "*"
+pytest = "^7.1.2"
 
 [tool.poetry.scripts]
 nvpy = "nvpy.nvpy:main"
