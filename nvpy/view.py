@@ -890,17 +890,19 @@ class NoteText(RedirectedText):
             self._hit_index = 0
             self.cycle = False
 
-    def triggeredcomplete(self) -> None:
+    def triggeredcomplete(self) -> bool:
         """
         Complete the entry and save positions of completed word
         for the next call.
+
+        Returns True if completion succeedes, False otherwise.
         """
         current_line = self.get_current_line()
         line, cur_col = self.cursor_pos
         open_bracket_pos = current_line.rfind("[[", 0, cur_col)
         if open_bracket_pos == -1:
             # completion marker not found
-            return
+            return False
 
         word_start = open_bracket_pos + 2
 
@@ -918,7 +920,7 @@ class NoteText(RedirectedText):
                 word_end = close_bracket_pos + 2
                 if word_end < cur_col:
                     # cursor position is outside the link string "[[...]]".
-                    return
+                    return False
                 if word_end - 2 < cur_col:
                     # cursor position is upon "]]".
                     word_prefix_end = word_end - 2
@@ -954,6 +956,10 @@ class NoteText(RedirectedText):
 
             self.word_end_index = new_eow_index
 
+            return True
+
+        return False
+
     def _end_complete(self):
         self.cycle = False
         self.selection_clear()
@@ -969,8 +975,9 @@ class NoteText(RedirectedText):
 
         if event.keysym == "space" and ctrl:
             # perform completion
-            self.triggeredcomplete()
-            self.cycle = True
+            # self.triggeredcomplete()
+            # self.cycle = True
+            self.cycle = self.triggeredcomplete()
             return "break"
 
         # releasing Ctrl should not break cycle
@@ -1320,6 +1327,7 @@ class View(utils.SubjectMixin):
         menu.add_cascade(label="Notes", underline=1, menu=notes_menu)
 
         self.sort_mode_var = tk.StringVar()
+        self.sort_mode_var.set(self.config.sort_mode)
         for mode in self.sort_modes:
             notes_menu.add_radiobutton(label=f"Sort by {mode}", value=mode, variable=self.sort_mode_var)
         notes_menu.add_separator()
