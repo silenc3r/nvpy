@@ -4,14 +4,14 @@
 import datetime
 import random
 import re
+import threading
+from queue import Empty as QueueEmpty
+from queue import Queue
 from urllib.error import URLError
 from urllib.request import urlopen
-from queue import Queue, Empty as QueueEmpty
-from .p3port import unicode
-
-import threading
 
 from . import tk
+from .p3port import unicode
 
 # first line with non-whitespace should be the title
 note_title_re = re.compile(r"\s*(.*)\n?")

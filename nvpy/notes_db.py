@@ -1,32 +1,32 @@
 # nvPY: cross-platform note-taking app with simplenote syncing
 # copyright 2012 by Charl P. Botha <cpbotha@vxlabs.com>
 # new BSD license
-import sys
+import abc
+import base64
 import codecs
 import copy
+import enum
 import glob
-import os
 import json
 import logging
-import enum
-import abc
-import unicodedata
-import pathlib
-from pathlib import Path
+import os
+import re
+import sys
 import threading
-from queue import Queue, Empty
-from http.client import HTTPException
-from .p3port import unicode
-from threading import Thread, Lock
 import time
 import typing
+import unicodedata
+from http.client import HTTPException
+from pathlib import Path
+from queue import Empty, Queue
+from threading import Lock, Thread
 from typing import Any, Dict, List, Optional, Tuple
-import re
-import base64
+
 import simplenote  # type:ignore
-from . import events
-from . import utils
+
+from . import events, utils
 from .debug import wrap_buggy_function
+from .p3port import unicode
 
 FilterResult = Tuple[List["NoteInfo"], str, int]
 

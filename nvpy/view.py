@@ -4,18 +4,16 @@
 
 import logging
 import os
-import re
-from . import search_entry
-from . import tk
-from tkinter import messagebox as tkMessageBox
-import tkinter.font as tkFont  # type:ignore
-from . import utils
-import threading
-from . import events
-import typing
-from typing import Any, List, Optional, Set, Tuple
-import subprocess
 import platform
+import re
+import subprocess
+import threading
+import tkinter.font as tkFont  # type:ignore
+import typing
+from tkinter import messagebox as tkMessageBox
+from typing import Any, List, Optional, Set, Tuple
+
+from . import events, search_entry, tk, utils
 from .notes_db import Note
 
 

@@ -28,40 +28,40 @@
 #   a) saving to disc: remember lmodified or whatever.
 #   b) syncing with simplenote
 
-# to check if we're online
-import sys
-import codecs
-from configparser import ConfigParser
-from .p3port import unicode
-import logging
-from logging.handlers import RotatingFileHandler
-from .notes_db import (
-    NotesDB,
-    SyncError,
-    ReadError,
-    WriteError,
-    SortMode,
-    MergedSorter,
-    PinnedSorter,
-    AlphaSorter,
-    DateSorter,
-    AlphaNumSorter,
-)
 import argparse
+import codecs
+import logging
 import os
-import traceback
-import threading
-import re
-import typing
-from . import tk
-from .utils import SubjectMixin
-from . import view
-import webbrowser
-from .version import VERSION
-from . import events
-from http.client import HTTPException
 import pathlib
 import platform
+import re
+
+# to check if we're online
+import sys
+import threading
+import traceback
+import typing
+import webbrowser
+from configparser import ConfigParser
+from http.client import HTTPException
+from logging.handlers import RotatingFileHandler
+
+from . import events, tk, view
+from .notes_db import (
+    AlphaNumSorter,
+    AlphaSorter,
+    DateSorter,
+    MergedSorter,
+    NotesDB,
+    PinnedSorter,
+    ReadError,
+    SortMode,
+    SyncError,
+    WriteError,
+)
+from .p3port import unicode
+from .utils import SubjectMixin
+from .version import VERSION
 
 try:
     import markdown  # type:ignore
