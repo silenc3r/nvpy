@@ -45,21 +45,12 @@ import webbrowser
 from configparser import ConfigParser
 from http.client import HTTPException
 from logging.handlers import RotatingFileHandler
+from typing import List
 
 from . import events, tk, view
-from .notes_db import (
-    AlphaNumSorter,
-    AlphaSorter,
-    DateSorter,
-    MergedSorter,
-    NotesDB,
-    PinnedSorter,
-    ReadError,
-    SortMode,
-    SyncError,
-    WriteError,
-)
+from .notes_db import NotesDB, NoteInfo, ReadError, SyncError, WriteError
 from .p3port import unicode
+from .sorters import SortMode, new_sorter
 from .utils import SubjectMixin
 from .version import VERSION
 
@@ -112,6 +103,13 @@ class Config:
     @ivar files_read: list of config files that were parsed.
     @ivar ok: True if config files had a default section, False otherwise.
     """
+
+    SORTERS = {
+        "title (alphabetical order)": SortMode.ALPHA,  # 0
+        "title (alphanumerical order)": SortMode.ALPHA_NUM,  # 3
+        "modification date": SortMode.MODIFICATION_DATE,  # 1
+        "creation date": SortMode.CREATION_DATE,  # 2
+    }
 
     def __init__(self, app_dir: str, cfg: typing.Optional[str]):
         """
@@ -300,23 +298,19 @@ class Config:
         return cp.read(cfg_files), cp
 
     @property
-    def sorter(self):
-        mode = SortMode(self.sort_mode)
+    def sorter_name(self) -> str:
+        """Return current sorter name."""
+        ivd = {mode: name for name, mode in self.SORTERS.items()}
+        return ivd[SortMode(self.sort_mode)]
 
-        sorters = []
-        if self.pinned_ontop:
-            sorters.append(PinnedSorter())
+    @sorter_name.setter
+    def sorter_name(self, name: str):
+        self.sort_mode = self.SORTERS[name].value
 
-        if mode == SortMode.ALPHA:
-            sorters.append(AlphaSorter())
-        elif mode in [SortMode.MODIFICATION_DATE, SortMode.CREATION_DATE]:
-            sorters.append(DateSorter(mode=mode))
-        elif mode == SortMode.ALPHA_NUM:
-            sorters.append(AlphaNumSorter())
-        else:
-            raise ValueError(f"invalid sort_mode: {mode}")
-
-        return MergedSorter(*sorters)
+    @property
+    def sort_modes(self):
+        """List all sort modes."""
+        return tuple(self.SORTERS.keys())
 
     def show_warnings(self):
         """Show warnings when using obsoleted option."""
@@ -359,35 +353,39 @@ class NotesListModel(SubjectMixin):
     @ivar list: List of (str key, dict note) objects.
     """
 
-    def __init__(self):
+    def __init__(self, sort_mode: int, pinned_on_top: bool):
         # call mixin ctor
         SubjectMixin.__init__(self)
 
-        self.list = []
-        self._match_regexps = []
+        # SortMode value. Reflects config setting
+        self.sort_mode = sort_mode
+        # Whether to place pinned notes on top
+        self.pinned_on_top = pinned_on_top
+        self.list: List[NoteInfo] = []
+        # Regexps used for highlighting search matches in notes
+        self.match_regexps: str = ""
 
     def set_list(self, alist):
         self.list = alist
+        self.list.sort(key=self.sorter)
         self.notify_observers("set:list", None)
 
+    def sort(self):
+        self.list.sort(key=self.sorter)
+
     @property
-    def match_regexps(self):
-        return self._match_regexps
+    def sorter(self):
+        return new_sorter(self.sort_mode, self.pinned_on_top)
 
-    @match_regexps.setter
-    def match_regexps(self, val):
-        self._match_regexps = val
-
-    def get_idx(self, key):
+    def get_idx(self, key) -> int:
         """Find idx for passed LOCAL key."""
-        found = [i for i, e in enumerate(self.list) if e.key == key]
-        if found:
-            return found[0]
+        for i, e in enumerate(self.list):
+            if e.key == key:
+                return i
 
-        else:
-            return -1
+        return -1
 
-    def get(self, key):
+    def get(self, key) -> NoteInfo:
         idx = self.get_idx(key)
         if idx < 0:
             raise KeyError("Note is not found: key={}".format(key))
@@ -397,13 +395,6 @@ class NotesListModel(SubjectMixin):
 
 class Controller:
     """Main application class."""
-
-    SORT_MODES = {
-        "title (alphabetical order)": SortMode.ALPHA,
-        "title (alphanumerical order)": SortMode.ALPHA_NUM,
-        "modification date": SortMode.MODIFICATION_DATE,
-        "creation date": SortMode.CREATION_DATE,
-    }
 
     def __init__(self, config):
         SubjectMixin.MAIN_THREAD = threading.current_thread()
@@ -458,9 +449,9 @@ class Controller:
                 # Do not use css styling for markdown.
                 self.config.md_css_path = None
 
-        self.notes_list_model = NotesListModel()
+        self.notes_list_model = NotesListModel(self.config.sort_mode, self.config.pinned_ontop)
         # create the interface
-        self.view = view.View(self.config, self.notes_list_model, sort_modes=tuple(self.SORT_MODES.keys()))
+        self.view = view.View(self.config, self.notes_list_model)
 
         try:
             # read our database of notes into memory
@@ -481,6 +472,8 @@ class Controller:
                 self.notes_db.add_observer("error:sync_full", self.observer_notes_db_error_sync_full)
                 self.notes_db.add_observer("complete:sync_full", self.observer_notes_db_complete_sync_full)
 
+            self.notes_list_model.add_observer("set:list", self.observer_notes_list)
+
             # we want to be notified when the user does stuff
             self.view.add_observer("click:notelink", self.observer_view_click_notelink)
             self.view.add_observer("delete:note", self.observer_view_delete_note)
@@ -494,8 +487,6 @@ class Controller:
             self.view.add_observer("command:rest", self.observer_view_rest)
             self.view.add_observer("delete:tag", self.observer_view_delete_tag)
             self.view.add_observer("add:tag", self.observer_view_add_tag)
-            self.view.add_observer("change:sort_mode", self.observer_view_change_sort_mode)
-            self.view.add_observer("change:pinned_on_top", self.observer_view_change_pinned_on_top)
 
             if self.config.simplenote_sync:
                 self.view.add_observer("command:sync_full", lambda v, et, e: self.sync_full())
@@ -553,7 +544,7 @@ class Controller:
 
     def observer_notes_db_change_note_status(self, notes_db, evt_type, evt: events.NoteStatusChangedEvent):
         skey = self.selected_note_key
-        if skey == evt.key:
+        if skey and skey == evt.key:
             self.view.set_note_status(self.notes_db.get_note_status(skey))
 
     def observer_notes_db_sync_full(self, notes_db, evt_type, evt: events.SyncProgressEvent):
@@ -638,6 +629,8 @@ class Controller:
 
         # first get key of note that is to be deleted
         key = self.selected_note_key
+        if not key:
+            return
 
         # then try to select after the one that is to be deleted
         nidx = evt.sel + 1
@@ -832,7 +825,7 @@ class Controller:
             self.view.select_note(idx, silent=True)
 
             # see if the note has been updated (content, tags, pin)
-            new_note = self.notes_db.get_note(k)
+            new_note = self.notes_db.get_note(k)  # type: ignore
 
             # check if the currently selected note is different from the one
             # currently being displayed. this could happen if a sync gets
@@ -856,12 +849,12 @@ class Controller:
             self.notes_db.set_note_content(self.selected_note_key, self.view.get_text())
 
     def observer_view_delete_tag(self, view, evt_type, evt: events.TagRemovedEvent):
-        self.notes_db.delete_note_tag(self.selected_note_key, evt.tag)
+        self.notes_db.delete_note_tag(self.selected_note_key, evt.tag)  # type: ignore
         self.view.cmd_notes_list_select()
 
     def observer_view_add_tag(self, view, evt_type, evt: events.TagsAddedEvent):
         comma_separated_tags = ",".join(evt.tags)
-        self.notes_db.add_note_tags(self.selected_note_key, comma_separated_tags)
+        self.notes_db.add_note_tags(self.selected_note_key, comma_separated_tags)  # type: ignore
         self.view.cmd_notes_list_select()
         self.view.tags_entry_var.set("")
 
@@ -871,14 +864,9 @@ class Controller:
             evt_val_int = int(evt.value)
             self.notes_db.set_note_pinned(self.selected_note_key, evt_val_int)
 
-    def observer_view_change_sort_mode(self, view, evt_type, evt: events.SortModeChangedEvent):
-        self.config.sort_mode = self.SORT_MODES[evt.mode].value
-        # Refresh notes list.
-        self.view.refresh_notes_list()
-
-    def observer_view_change_pinned_on_top(self, view, evt_type, evt: events.PinnedOnTopChangedEvent):
-        self.config.pinned_ontop = evt.pinned_on_top
-        self.view.refresh_notes_list()
+    def observer_notes_list(self, notes_list_model, evt_type, evt):
+        # re-render!
+        self.view.set_notes(self.notes_list_model.list)
 
     def observer_view_close(self, view, evt_type, evt):
         # check that everything has been saved and synced before exiting
@@ -963,7 +951,8 @@ class Controller:
 
     def update_note_status(self):
         skey = self.selected_note_key
-        self.view.set_note_status(self.notes_db.get_note_status(skey))
+        if skey:
+            self.view.set_note_status(self.notes_db.get_note_status(skey))
 
 
 def get_appdir():

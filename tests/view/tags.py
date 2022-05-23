@@ -25,7 +25,7 @@ class Tags(unittest.TestCase):
         return mockConfig
 
     def test_tag_buttons_are_created_when_displaying_a_note(self):
-        mockNotesListModel = NotesListModel()
+        mockNotesListModel = NotesListModel(1, True)
 
         mockNotesListModel.add_observer = Mock()
 
@@ -55,7 +55,7 @@ class Tags(unittest.TestCase):
         view.close()
 
     def test_view_can_check_if_a_note_has_not_changed(self):
-        mockNotesListModel = NotesListModel()
+        mockNotesListModel = NotesListModel(1, True)
         mockNotesListModel.add_observer = Mock()
         view = View(self.__mock_config(), mockNotesListModel)
 
@@ -75,7 +75,7 @@ class Tags(unittest.TestCase):
         view.close()
 
     def test_view_can_check_if_a_notes_content_has_changed(self):
-        mockNotesListModel = NotesListModel()
+        mockNotesListModel = NotesListModel(1, True)
         mockNotesListModel.add_observer = Mock()
         view = View(self.__mock_config(), mockNotesListModel)
 
@@ -106,7 +106,7 @@ class Tags(unittest.TestCase):
         view.close()
 
     def test_view_can_check_if_a_notes_tags_has_changed(self):
-        mockNotesListModel = NotesListModel()
+        mockNotesListModel = NotesListModel(1, True)
         mockNotesListModel.add_observer = Mock()
         view = View(self.__mock_config(), mockNotesListModel)
 

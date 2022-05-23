@@ -1,11 +1,11 @@
 import unittest
-import nvpy.notes_db as notes_db
+import nvpy.sorters as sorters
 
-Nullable = notes_db.AlphaNumSorter.Nullable
+Nullable = sorters.AlphaNumSorter.Nullable
 
 
-def create_note(title, createdate=1, modifydate=2) -> notes_db.NoteInfo:
-    return notes_db.NoteInfo(
+def create_note(title, createdate=1, modifydate=2) -> sorters.NoteInfo:
+    return sorters.NoteInfo(
         key="xxx",
         note={
             "content": title,
@@ -51,10 +51,10 @@ class AlphaNumSorter_Nullable(unittest.TestCase):
 
 class AlphaNumSorter(unittest.TestCase):
     def make_sort_key(self, title):
-        return notes_db.AlphaNumSorter()(create_note(title))
+        return sorters.AlphaNumSorter()(create_note(title))
 
     def test_sort_keys(self):
-        Element = notes_db.AlphaNumSorter.Element
+        Element = sorters.AlphaNumSorter.Element
 
         self.assertTupleEqual(
             self.make_sort_key("foo"),
@@ -84,7 +84,7 @@ class AlphaNumSorter(unittest.TestCase):
         )
 
     def test_sort_order(self):
-        sorter = notes_db.AlphaNumSorter()
+        sorter = sorters.AlphaNumSorter()
         notes = [
             create_note(""),
             create_note("abcd"),
@@ -118,7 +118,7 @@ class AlphaNumSorter(unittest.TestCase):
 
 class DateSorter(unittest.TestCase):
     def test_sort_by_modification_date(self):
-        sorter = notes_db.DateSorter(notes_db.SortMode.MODIFICATION_DATE)
+        sorter = sorters.DateSorter(sorters.SortMode.MODIFICATION_DATE)
         notes = [
             create_note("zzz", createdate=99, modifydate=1),
             create_note("yyy", createdate=96, modifydate=2),
@@ -136,7 +136,7 @@ class DateSorter(unittest.TestCase):
         )
 
     def test_sort_by_creation_date(self):
-        sorter = notes_db.DateSorter(notes_db.SortMode.CREATION_DATE)
+        sorter = sorters.DateSorter(sorters.SortMode.CREATION_DATE)
         notes = [
             create_note("zzz", createdate=1, modifydate=99),
             create_note("yyy", createdate=2, modifydate=96),
@@ -155,8 +155,8 @@ class DateSorter(unittest.TestCase):
 
     def test_fail_if_unexpected_mode_specified(self):
         with self.assertRaises(ValueError):
-            notes_db.DateSorter(notes_db.SortMode.ALPHA)
+            sorters.DateSorter(sorters.SortMode.ALPHA)
         with self.assertRaises(ValueError):
-            notes_db.DateSorter(2)
+            sorters.DateSorter(2)
         with self.assertRaises(ValueError):
-            notes_db.DateSorter("creation_date")
+            sorters.DateSorter("creation_date")

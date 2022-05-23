@@ -50,11 +50,3 @@ class SyncFailedEvent(typing.NamedTuple):
 
 class SyncProgressEvent(typing.NamedTuple):
     msg: str
-
-
-class SortModeChangedEvent(typing.NamedTuple):
-    mode: str
-
-
-class PinnedOnTopChangedEvent(typing.NamedTuple):
-    pinned_on_top: bool

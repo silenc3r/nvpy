@@ -989,14 +989,12 @@ class NoteText(RedirectedText):
 class View(utils.SubjectMixin):
     """Main user interface class."""
 
-    def __init__(self, config, notes_list_model, sort_modes: typing.Tuple[str, ...] = ("random",)):
+    def __init__(self, config, notes_list_model):
         utils.SubjectMixin.__init__(self)
 
         self.config = config
         self.taglist = None
-        self.sort_modes = sort_modes
 
-        notes_list_model.add_observer("set:list", self.observer_notes_list)
         self.notes_list_model = notes_list_model
         self.timer_ids_lock = threading.Lock()
         self.timer_ids: Set[Any] = set()
@@ -1225,8 +1223,6 @@ class View(utils.SubjectMixin):
         self.search_entry_var.trace("w", self.handler_search_entry)
         self.search_mode_var.trace("w", self.handler_search_mode)
         self.pinned_checkbutton_var.trace("w", self.handler_pinned_checkbutton)
-        self.sort_mode_var.trace("w", self.handler_sort_mode_change)
-        self.pinned_on_top_var.trace("w", self.handler_pinned_on_top_change)
 
         self.after(self.config.housekeeping_interval_ms, self.handler_housekeeper)
 
@@ -1325,14 +1321,20 @@ class View(utils.SubjectMixin):
         menu.add_cascade(label="Notes", underline=1, menu=notes_menu)
 
         self.sort_mode_var = tk.StringVar()
-        self.sort_mode_var.set(self.config.sort_mode)
-        for mode in self.sort_modes:
-            notes_menu.add_radiobutton(label=f"Sort by {mode}", value=mode, variable=self.sort_mode_var)
+        self.sort_mode_var.set(self.config.sorter_name)
+        for mode in self.config.sort_modes:
+            notes_menu.add_radiobutton(
+                label=f"Sort by {mode}", value=mode, variable=self.sort_mode_var, command=self.handler_sort_mode_change
+            )
         notes_menu.add_separator()
         self.pinned_on_top_var = tk.BooleanVar()
         self.pinned_on_top_var.set(self.config.pinned_ontop)
         notes_menu.add_checkbutton(
-            label="Pinned notes to top", onvalue=True, offvalue=False, variable=self.pinned_on_top_var
+            label="Pinned notes to top",
+            onvalue=True,
+            offvalue=False,
+            variable=self.pinned_on_top_var,
+            command=self.handler_pinned_on_top_change,
         )
 
         # SEARCH #######################################################
@@ -1492,7 +1494,11 @@ class View(utils.SubjectMixin):
             sort_mode_label = tk.Label(sort_mode_frame, text="Sort by")
             sort_mode_label.pack(side=tk.LEFT)
             sort_mode_selector = tk.OptionMenu(
-                sort_mode_frame, self.sort_mode_var, self.sort_modes[0], *self.sort_modes
+                sort_mode_frame,
+                self.sort_mode_var,
+                self.config.sorter_name,
+                *self.config.sort_modes,
+                command=self.handler_sort_mode_change,
             )
             sort_mode_selector.pack(side=tk.LEFT, fill=tk.X, expand=1)
 
@@ -2002,10 +2008,29 @@ class View(utils.SubjectMixin):
         return "break"
 
     def handler_sort_mode_change(self, *args):
-        self.notify_observers("change:sort_mode", events.SortModeChangedEvent(self.sort_mode_var.get()))
+        # we use *args because radio button callback has weird type
+        self.config.sorter_name = self.sort_mode_var.get()
+        self.notes_list_model.sort_mode = self.config.sort_mode
+        self.sort_notes()
+        # self.refresh_notes_list()
 
     def handler_pinned_on_top_change(self, *args):
-        self.notify_observers("change:pinned_on_top", events.PinnedOnTopChangedEvent(self.pinned_on_top_var.get()))
+        self.config.pinned_ontop = self.pinned_on_top_var.get()
+        self.notes_list_model.pinned_on_top = self.config.pinned_ontop
+        self.sort_notes()
+        # self.refresh_notes_list()
+
+    def sort_notes(self):
+        # alternative to refresh_notes_list that doesn't go through NotesDB
+        old_idx = self.notes_list.selected_idx
+        note_selected = old_idx != -1
+        key = self.notes_list_model.list[old_idx].key if note_selected else ""
+        self.notes_list_model.sort()
+        # TODO: we shouldn't update everything
+        self.set_notes(self.notes_list_model.list)
+        if note_selected:
+            new_idx = self.notes_list_model.get_idx(key)
+            self.select_note(new_idx, silent=True)
 
     def is_note_different(self, note):
         """
@@ -2026,11 +2051,6 @@ class View(utils.SubjectMixin):
 
         if bool(self.pinned_checkbutton_var.get()) != bool(utils.note_pinned(note)):
             return True
-
-    def observer_notes_list(self, notes_list_model, evt_type, evt):
-        if evt_type == "set:list":
-            # re-render!
-            self.set_notes(notes_list_model.list)
 
     def main_loop(self):
         self.root.mainloop()
