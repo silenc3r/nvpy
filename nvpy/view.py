@@ -1220,8 +1220,8 @@ class View(utils.SubjectMixin):
         self.tags_entry.bind("<Return>", self.handler_add_tags_to_selected_note)
         self.tags_entry.bind("<Escape>", lambda e: self.text_note.focus())
 
-        self.search_entry_var.trace("w", self.handler_search_entry)
-        self.pinned_checkbutton_var.trace("w", self.handler_pinned_checkbutton)
+        # tk.Entry doesn't have command parameter so we have to monitor variable.
+        self.search_entry_var.trace_add("write", callback=self.handler_search_entry)
 
         self.after(self.config.housekeeping_interval_ms, self.handler_housekeeper)
 
@@ -1313,7 +1313,13 @@ class View(utils.SubjectMixin):
         menu.add_cascade(label="Note", underline=0, menu=note_menu)
 
         self.pinned_checkbutton_var = tk.IntVar()
-        note_menu.add_checkbutton(label="Pinned", onvalue=1, offvalue=0, variable=self.pinned_checkbutton_var)
+        note_menu.add_checkbutton(
+            label="Pinned",
+            onvalue=1,
+            offvalue=0,
+            variable=self.pinned_checkbutton_var,
+            command=self.handler_pinned_checkbutton,
+        )
 
         # NOTES ########################################################
         notes_menu = tk.Menu(menu, tearoff=False)
@@ -1535,7 +1541,9 @@ class View(utils.SubjectMixin):
         pinned_label = tk.Label(note_pinned_frame, text="Pinned")
         pinned_label.pack(side=tk.LEFT)
         # self.pinned_checkbutton_var = tk.IntVar() # Moved to note menu code area
-        self.pinned_checkbutton = tk.Checkbutton(note_pinned_frame, variable=self.pinned_checkbutton_var)
+        self.pinned_checkbutton = tk.Checkbutton(
+            note_pinned_frame, variable=self.pinned_checkbutton_var, command=self.handler_pinned_checkbutton
+        )
         self.pinned_checkbutton.pack(side=tk.LEFT)
 
         note_tags_frame = tk.Frame(note_pinned_frame)
@@ -1751,6 +1759,7 @@ class View(utils.SubjectMixin):
             raise
 
     def toggle_pinned_checkbutton(self):
+        # Used for keybinding (Ctrl-s)
         self.pinned_checkbutton_var.set(not self.pinned_checkbutton_var.get())
         self.handler_pinned_checkbutton()
 
