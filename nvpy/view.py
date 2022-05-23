@@ -1221,7 +1221,6 @@ class View(utils.SubjectMixin):
         self.tags_entry.bind("<Escape>", lambda e: self.text_note.focus())
 
         self.search_entry_var.trace("w", self.handler_search_entry)
-        self.search_mode_var.trace("w", self.handler_search_mode)
         self.pinned_checkbutton_var.trace("w", self.handler_pinned_checkbutton)
 
         self.after(self.config.housekeeping_interval_ms, self.handler_housekeeper)
@@ -1342,10 +1341,12 @@ class View(utils.SubjectMixin):
         menu.add_cascade(label="Search", underline=0, menu=search_menu)
 
         self.search_mode_options = ("gstyle", "regexp")
-        self.search_mode_var = tk.StringVar()
+        self.search_mode_var = tk.StringVar(value=self.config.search_mode)
 
         for mode in self.search_mode_options:
-            search_menu.add_radiobutton(label=f"Search mode {mode}", value=mode, variable=self.search_mode_var)
+            search_menu.add_radiobutton(
+                label=f"Search mode {mode}", value=mode, variable=self.search_mode_var, command=self.handler_search_mode
+            )
 
         search_menu.add_separator()
 
@@ -1444,10 +1445,12 @@ class View(utils.SubjectMixin):
         )
 
         # self.search_mode_options = ("gstyle", "regexp") # Moved to search menu code area
-        # self.search_mode_var = tk.StringVar()
-        # I'm working with ttk.OptionVar, which has that extra default param!
         self.search_mode_cb = tk.OptionMenu(
-            search_frame, self.search_mode_var, self.search_mode_options[0], *self.search_mode_options
+            search_frame,
+            self.search_mode_var,
+            self.search_mode_var.get(),
+            *self.search_mode_options,
+            command=self.handler_search_mode,
         )
         self.search_mode_cb.config(width=6)
 
@@ -1789,11 +1792,11 @@ class View(utils.SubjectMixin):
         Called when the user changes the search mode via the OptionMenu.
 
         This will also be called even if the user reselects the same option.
-
-        @param args:
-        @return:
         """
-        self.notify_observers("change:search_mode", events.CheckboxChangedEvent(value=self.search_mode_var.get()))
+        current_mode = self.search_mode_var.get()
+        if current_mode != self.config.search_mode:
+            self.config.search_mode = current_mode
+            self.refresh_notes_list()
 
     def handler_add_tags_to_selected_note(self, evt=None):
         tag_list = self.tags_entry_var.get().split(",")
@@ -2064,21 +2067,6 @@ class View(utils.SubjectMixin):
     def search(self, e):
         self.search_entry.focus()
         self.search_entry.selection_range(0, tk.END)
-
-    def set_search_mode(self, search_mode, silent=False):
-        """
-
-        @param search_mode: the search mode, "gstyle" or "regexp"
-        @param silent: Specify True if you don't want the view to trigger any events.
-        @return:
-        """
-
-        if silent:
-            self.mute("change:search_mode")
-
-        self.search_mode_var.set(search_mode)
-
-        self.unmute("change:search_mode")
 
     def set_status_text(self, txt):
         self.statusbar.set_status(txt)
