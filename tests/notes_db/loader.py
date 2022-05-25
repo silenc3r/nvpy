@@ -3,26 +3,29 @@ import shutil
 import unittest
 import pathlib
 import json
-from nvpy.nvpy import Config
-from nvpy.notes_db import NotesDB
+from nvpy.notes_db import DBConfig, Note, NotesDB
 
 now = 1111111444
-note1 = {
-    "modifydate": 1111111222,
-    "tags": [],
-    "createdate": 1111111111,
-    "syncdate": 0,
-    "content": "note",
-    "savedate": now,
-}
-note2 = {
-    "modifydate": 1111111333,
-    "tags": [],
-    "createdate": 1111111222,
-    "syncdate": 0,
-    "content": "another note\nfoo bar",
-    "savedate": now,
-}
+note1 = Note(
+    {
+        "modifydate": 1111111222,
+        "tags": [],
+        "createdate": 1111111111,
+        "syncdate": 0,
+        "content": "note",
+        "savedate": now,
+    }
+)
+note2 = Note(
+    {
+        "modifydate": 1111111333,
+        "tags": [],
+        "createdate": 1111111222,
+        "syncdate": 0,
+        "content": "another note\nfoo bar",
+        "savedate": now,
+    }
+)
 
 
 class Loader(unittest.TestCase):
@@ -33,17 +36,19 @@ class Loader(unittest.TestCase):
             shutil.rmtree(self.BASE_DIR)
 
     def __mock_config(self, notes_as_txt=False):
-        app_dir = os.path.abspath("nvpy")
+        conf = DBConfig(
+            db_path=self.BASE_DIR,
+            simplenote_sync=0,
+            sn_username="",
+            sn_password="",
+            search_tags=1,
+            notes_as_txt=notes_as_txt,
+            txt_path=self.BASE_DIR + "/notes",
+            replace_filename_spaces=True,
+            read_txt_extensions="txt,mkdn,md,mdown,markdown",
+        )
 
-        mockConfig = Config(app_dir, [])
-        mockConfig.sn_username = ""
-        mockConfig.sn_password = ""
-        mockConfig.db_path = self.BASE_DIR
-        mockConfig.txt_path = self.BASE_DIR + "/notes"
-        mockConfig.simplenote_sync = 0
-        mockConfig.notes_as_txt = notes_as_txt
-
-        return mockConfig
+        return conf
 
     @property
     def __json_dir(self) -> pathlib.Path:

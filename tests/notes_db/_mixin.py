@@ -1,8 +1,7 @@
 import os
 import shutil
 from pathlib import Path
-from nvpy.nvpy import Config
-from nvpy.notes_db import NotesDB
+from nvpy.notes_db import DBConfig, NotesDB
 
 
 class DBMixin:
@@ -15,18 +14,19 @@ class DBMixin:
             shutil.rmtree(self.BASE_DIR)
 
     def _mock_config(self, notes_as_txt=False, simplenote_sync=False):
-        app_dir = os.path.abspath("nvpy")
+        conf = DBConfig(
+            db_path=self.BASE_DIR,
+            simplenote_sync=simplenote_sync,
+            sn_username="",
+            sn_password="",
+            search_tags=1,
+            notes_as_txt=notes_as_txt,
+            txt_path=self.BASE_DIR + "/notes",
+            replace_filename_spaces=False,
+            read_txt_extensions="txt,mkdn,md,mdown,markdown",
+        )
 
-        mockConfig = Config(app_dir, [])
-        mockConfig.sn_username = ""
-        mockConfig.sn_password = ""
-        mockConfig.db_path = self.BASE_DIR
-        mockConfig.txt_path = self.BASE_DIR + "/notes"
-        mockConfig.simplenote_sync = simplenote_sync
-        mockConfig.notes_as_txt = notes_as_txt
-        mockConfig.replace_filename_spaces = False
-
-        return mockConfig
+        return conf
 
     def _db(self, notes_as_txt=False, simplenote_sync=False):
         return NotesDB(self._mock_config(notes_as_txt, simplenote_sync))

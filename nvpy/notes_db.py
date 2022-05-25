@@ -155,6 +155,18 @@ class NoteInfo(typing.NamedTuple):
     tagfound: int  # XXX: is this used anywhere?
 
 
+class DBConfig(typing.NamedTuple):
+    db_path: str
+    simplenote_sync: int
+    sn_username: str
+    sn_password: str
+    search_tags: int
+    notes_as_txt: int
+    txt_path: str
+    replace_filename_spaces: int
+    read_txt_extensions: str
+
+
 class _BackgroundTask(typing.NamedTuple):
     action: int
     key: str
@@ -171,11 +183,9 @@ class _BackgroundTaskReslt(typing.NamedTuple):
 class NotesDB(utils.SubjectMixin):
     """NotesDB will take care of the local notes database and syncing with SN."""
 
-    def __init__(self, config):
+    def __init__(self, config: DBConfig):
         utils.SubjectMixin.__init__(self)
 
-        # TODO: we probably should use custom immutable config and pass
-        # additional arguments to functions as needed
         self.config = config
 
         self.store = FileStore(self.config)
@@ -184,8 +194,8 @@ class NotesDB(utils.SubjectMixin):
         self.notes_lock = threading.Lock()
 
         # save and sync queue
-        self.q_save = Queue()
-        self.q_save_res = Queue()
+        self.q_save: Queue[_BackgroundTask] = Queue()
+        self.q_save_res: Queue[_BackgroundTask] = Queue()
 
         thread_save = Thread(target=wrap_buggy_function(self.worker_save))
         thread_save.setDaemon(True)
@@ -205,8 +215,8 @@ class NotesDB(utils.SubjectMixin):
 
             self.syncing_lock = Lock()
 
-            self.q_sync = Queue()
-            self.q_sync_res = Queue()
+            self.q_sync: Queue[_BackgroundTask] = Queue()
+            self.q_sync_res: Queue[_BackgroundTaskReslt] = Queue()
 
             thread_sync = Thread(target=wrap_buggy_function(self.worker_sync))
             thread_sync.setDaemon(True)
@@ -242,7 +252,9 @@ class NotesDB(utils.SubjectMixin):
         n["deleted"] = 1
         n["modifydate"] = time.time()
 
-    def filter_notes(self, search_string: Optional[str] = None) -> FilterResult:
+    def filter_notes(
+        self, search_string: Optional[str] = None, *, search_mode: str, case_sensitive: int
+    ) -> FilterResult:
         """Return list of notes filtered with search string.
 
         Based on the search mode that has been selected in self.config,
@@ -256,10 +268,14 @@ class NotesDB(utils.SubjectMixin):
         strings in the text widget; the total number of notes in memory.
         """
 
-        if self.config.search_mode == "regexp":
-            filtered_notes, match_regexp, active_notes = self.filter_notes_regexp(search_string)
+        if search_mode == "regexp":
+            filtered_notes, match_regexp, active_notes = self.filter_notes_regexp(
+                search_string, case_sensitive=case_sensitive
+            )
         else:
-            filtered_notes, match_regexp, active_notes = self.filter_notes_gstyle(search_string)
+            filtered_notes, match_regexp, active_notes = self.filter_notes_gstyle(
+                search_string, case_sensitive=case_sensitive
+            )
 
         return filtered_notes, match_regexp, active_notes
 
@@ -303,7 +319,7 @@ class NotesDB(utils.SubjectMixin):
         # all patterns match
         return True
 
-    def filter_notes_gstyle(self, search_string: Optional[str] = None) -> FilterResult:
+    def filter_notes_gstyle(self, search_string: Optional[str] = None, *, case_sensitive: int) -> FilterResult:
         filtered_notes = []
         # total number of notes, excluding deleted
         active_notes = 0
@@ -351,9 +367,9 @@ class NotesDB(utils.SubjectMixin):
 
                 c = n["content"]
                 # case insensitive mode: WARNING - SLOW!
-                if not self.config.case_sensitive and c:
+                if not case_sensitive and c:
                     c = c.lower()
-                msword_pats = word_patterns if self.config.case_sensitive else [p.lower() for p in word_patterns]
+                msword_pats = word_patterns if case_sensitive else [p.lower() for p in word_patterns]
                 if self._helper_gstyle_mswordmatch(msword_pats, c):
                     # we have a note that can go through!
 
@@ -366,7 +382,7 @@ class NotesDB(utils.SubjectMixin):
         match_regexp = "|".join(re.escape(p) for p in word_patterns)
         return filtered_notes, match_regexp, active_notes
 
-    def filter_notes_regexp(self, search_string: Optional[str] = None) -> FilterResult:
+    def filter_notes_regexp(self, search_string: Optional[str] = None, *, case_sensitive: int) -> FilterResult:
         """Return list of notes filtered with search_string,
         a regular expression, each a tuple with (local_key, note).
         """
@@ -374,7 +390,7 @@ class NotesDB(utils.SubjectMixin):
         sspat = None
         if search_string:
             try:
-                if self.config.case_sensitive == 0:
+                if case_sensitive == 0:
                     sspat = re.compile(search_string, re.MULTILINE | re.I)
                 else:
                     sspat = re.compile(search_string, re.MULTILINE)
@@ -382,9 +398,9 @@ class NotesDB(utils.SubjectMixin):
             except re.error:
                 sspat = None
 
-        filtered_notes = []
+        filtered_notes: List[NoteInfo] = []
         # total number of notes, excluding deleted ones
-        active_notes = 0
+        active_notes: int = 0
         with self.notes_lock:
             for k, n in self.notes.items():
                 if n.get("deleted"):
@@ -991,11 +1007,11 @@ class NotesDB(utils.SubjectMixin):
 
 
 class FileStore:
-    def __init__(self, config):
+    def __init__(self, config: DBConfig):
         self.config = config
         self.db_path = Path(self.config.db_path)
         if self.config.notes_as_txt:
-            self.titlelist = {}
+            self.titlelist: Dict[str, str] = {}
 
         # create db dir if it does not exist
         if not self.db_path.exists():
@@ -1030,9 +1046,9 @@ class FileStore:
             os.mkdir(self.config.txt_path)
 
         now = time.time()
-        notes = {}
-        fnlist = list(self.db_path.glob("*.json"))
-        txtlist = []
+        notes: Dict[str, Note] = {}
+        fnlist = list(glob.glob(self.config.db_path + "/*.json"))
+        txtlist: List[str] = []
 
         for ext in self.config.read_txt_extensions.split(","):
             txtlist += glob.glob(self.config.txt_path + "/*." + ext)
@@ -1053,7 +1069,9 @@ class FileStore:
                 nt = utils.get_note_title_file(n, self.config.replace_filename_spaces)
                 tfn = os.path.join(self.config.txt_path, nt)
                 if os.path.isfile(tfn):
-                    self.titlelist[n.get("key")] = nt
+                    key = n.get("key", None)
+                    if key:
+                        self.titlelist[key] = nt
                     txtlist.remove(tfn)
                     if os.path.getmtime(tfn) > os.path.getmtime(fn):
                         logging.debug("Text note was changed: %s" % (fn,))

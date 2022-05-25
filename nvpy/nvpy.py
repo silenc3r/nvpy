@@ -48,7 +48,7 @@ from logging.handlers import RotatingFileHandler
 from typing import List
 
 from . import events, tk, view
-from .notes_db import NotesDB, NoteInfo, ReadError, SyncError, WriteError
+from .notes_db import DBConfig, NotesDB, NoteInfo, ReadError, SyncError, WriteError
 from .p3port import unicode
 from .sorters import SortMode, new_sorter
 from .utils import SubjectMixin
@@ -457,7 +457,19 @@ class Controller:
             # read our database of notes into memory
             # and sync with simplenote.
             try:
-                self.notes_db = NotesDB(self.config)
+                # NotesDB doesn't need to read global config.
+                dbconf = DBConfig(
+                    db_path=self.config.db_path,
+                    simplenote_sync=self.config.simplenote_sync,
+                    sn_username=self.config.sn_username,
+                    sn_password=self.config.sn_password,
+                    search_tags=self.config.search_tags,
+                    notes_as_txt=self.config.notes_as_txt,
+                    txt_path=self.config.txt_path,
+                    replace_filename_spaces=self.config.replace_filename_spaces,
+                    read_txt_extensions=self.config.read_txt_extensions,
+                )
+                self.notes_db = NotesDB(dbconf)
             except ReadError as e:
                 emsg = "Please check nvpy.log.\n" + str(e)
                 self.view.show_error("Sync error", emsg)
@@ -495,7 +507,9 @@ class Controller:
             self.view.add_observer("close", self.observer_view_close)
 
             # nn is a list of (key, note) objects
-            nn, match_regexp, active_notes = self.notes_db.filter_notes()
+            nn, match_regexp, active_notes = self.notes_db.filter_notes(
+                search_mode=self.config.search_mode, case_sensitive=self.config.case_sensitive
+            )
             # this will trigger the list_change event
             self.notes_list_model.set_list(nn)
             self.notes_list_model.match_regexps = match_regexp
@@ -792,7 +806,9 @@ class Controller:
         k = self.selected_note_key
         # for each new evt.value coming in, get a new list from the notes_db
         # and set it in the notes_list_model
-        nn, match_regexp, active_notes = self.notes_db.filter_notes(evt.value)
+        nn, match_regexp, active_notes = self.notes_db.filter_notes(
+            evt.value, search_mode=self.config.search_mode, case_sensitive=self.config.case_sensitive
+        )
         self.notes_list_model.set_list(nn)
         self.notes_list_model.match_regexps = match_regexp
         self.view.set_note_tally(len(nn), active_notes, len(self.notes_db.notes))

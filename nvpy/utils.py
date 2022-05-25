@@ -33,7 +33,7 @@ def get_note_title(note):
         return ""
 
 
-def get_note_title_file(note, replace_filename_spaces):
+def get_note_title_file(note, replace_filename_spaces) -> str:
     mo = note_title_re.match(note.get("content", ""))
     if mo:
         fn = mo.groups()[0]
@@ -42,11 +42,6 @@ def get_note_title_file(note, replace_filename_spaces):
         fn = fn.replace("/", "_")
         if not fn:
             return ""
-
-        if isinstance(fn, str):
-            fn = unicode(fn, "utf-8")
-        else:
-            fn = unicode(fn, None)
 
         if note_markdown(note):
             fn += ".mkdn"
