@@ -343,7 +343,7 @@ class TagList(tk.Toplevel):
     def __init__(self, parent, taglist, view):
         tk.Toplevel.__init__(self, parent)
         self.title("List all tags")
-        self.bind("<Escape>", lambda a: self.destroy())
+        self.bind("<Escape>", lambda _: self.destroy())
 
         box = tk.Listbox(self, width=30, selectmode=tk.BROWSE)
         if taglist:
@@ -352,8 +352,8 @@ class TagList(tk.Toplevel):
             for item in alltags:
                 box.insert(tk.END, item)
             # bind double click and Enter (on box)
-            box.bind("<Double-Button-1>", lambda a: self.tagsel(box, view))
-            box.bind("<Return>", lambda a: self.tagsel(box, view))
+            box.bind("<Double-Button-1>", lambda _: self.tagsel(box, view))
+            box.bind("<Return>", lambda _: self.tagsel(box, view))
             box.focus()
         else:
             box.insert(tk.END, "No tags defined")
@@ -535,7 +535,7 @@ class NotesList(tk.Frame):
         self.enable_text()
 
         if self.layout == "vertical" and self.print_columns == 1:
-            nrchars, rem = divmod(self.text.winfo_width(), self.cwidth)
+            nrchars, _ = divmod(self.text.winfo_width(), self.cwidth)
             if self.hide_time:
                 nrchars = int(nrchars)
             else:
@@ -594,33 +594,33 @@ class NotesList(tk.Frame):
 
         # same deal as for pageup
         # we have to stop the text widget class event handler from firing
-        def cmd_up(e):
+        def cmd_up():
             self.select_prev(silent=False)
             return "break"
 
-        self.text.bind("<Up>", cmd_up)
-        self.text.bind("<Control-k>", cmd_up)
+        self.text.bind("<Up>", lambda _: cmd_up())
+        self.text.bind("<Control-k>", lambda _: cmd_up())
 
         # for pageup, event handler needs to return "break" so that
         # Text widget's default class handler for pageup does not trigger.
-        def cmd_pageup(e):
+        def cmd_pageup():
             self.select_prev(silent=False, delta=10)
             return "break"
 
-        self.text.bind("<Prior>", cmd_pageup)
+        self.text.bind("<Prior>", lambda _: cmd_pageup())
 
-        def cmd_down(e):
+        def cmd_down():
             self.select_next(silent=False)
             return "break"
 
-        self.text.bind("<Down>", cmd_down)
-        self.text.bind("<Control-j>", cmd_down)
+        self.text.bind("<Down>", lambda _: cmd_down())
+        self.text.bind("<Control-j>", lambda _: cmd_down())
 
-        def cmd_pagedown(e):
+        def cmd_pagedown():
             self.select_next(silent=False, delta=10)
             return "break"
 
-        self.text.bind("<Next>", cmd_pagedown)
+        self.text.bind("<Next>", lambda _: cmd_pagedown())
 
     def cmd_text_button1(self, event):
         # find line that was clicked on
@@ -713,7 +713,7 @@ class NotesList(tk.Frame):
 
         return (start, end)
 
-    def select(self, idx, silent=True):
+    def select(self, idx: int, silent=True):
         """
         @param idx: index of note to select. -1 if no selection.
         """
@@ -1176,11 +1176,11 @@ class View(utils.SubjectMixin):
         # make sure window close also goes through our handler
         self.root.protocol("WM_DELETE_WINDOW", self.handler_close)
 
-        self.root.bind_all("<Control-g>", lambda e: self.tags_entry.focus())
-        self.root.bind_all("<Control-question>", lambda e: self.cmd_help_bindings())
-        self.root.bind_all("<Control-plus>", lambda e: self.cmd_font_size(+1))
-        self.root.bind_all("<Control-minus>", lambda e: self.cmd_font_size(-1))
-        self.root.bind_all("<Control-S>", lambda e: self.toggle_pinned_checkbutton())
+        self.root.bind_all("<Control-g>", lambda _: self.tags_entry.focus())
+        self.root.bind_all("<Control-question>", lambda _: self.cmd_help_bindings())
+        self.root.bind_all("<Control-plus>", lambda _: self.cmd_font_size(+1))
+        self.root.bind_all("<Control-minus>", lambda _: self.cmd_font_size(-1))
+        self.root.bind_all("<Control-S>", lambda _: self.toggle_pinned_checkbutton())
 
         self.notes_list.bind("<<NotesListSelect>>", self.cmd_notes_list_select)
         # same behaviour as when the user presses enter on search entry:
@@ -1188,8 +1188,8 @@ class View(utils.SubjectMixin):
         # if nothing is selected, try to create new note with
         # search entry value as name
         self.notes_list.text.bind("<Return>", self.handler_search_enter)
-        self.notes_list.text.bind("<Escape>", lambda e: self.search_entry.focus())
-        self.notes_list.text.bind("<Control-bracketleft>", lambda e: self.search_entry.focus())
+        self.notes_list.text.bind("<Escape>", lambda _: self.search_entry.focus())
+        self.notes_list.text.bind("<Control-bracketleft>", lambda _: self.search_entry.focus())
 
         self.search_entry.bind("<Escape>", self.handler_search_escape)
         self.search_entry.bind("<Control-bracketleft>", self.handler_search_escape)
@@ -1197,20 +1197,19 @@ class View(utils.SubjectMixin):
         # if there's no selection, create a new note.
         self.search_entry.bind("<Return>", self.handler_search_enter)
 
-        self.search_entry.bind("<Up>", lambda e: self.notes_list.select_prev(silent=False))
-        self.search_entry.bind("<Control-k>", lambda e: self.notes_list.select_prev(silent=False))
-        self.search_entry.bind("<Prior>", lambda e: self.notes_list.select_prev(silent=False, delta=10))
+        self.search_entry.bind("<Up>", lambda _: self.notes_list.select_prev(silent=False))
+        self.search_entry.bind("<Control-k>", lambda _: self.notes_list.select_prev(silent=False))
+        self.search_entry.bind("<Prior>", lambda _: self.notes_list.select_prev(silent=False, delta=10))
 
-        self.search_entry.bind("<Down>", lambda e: self.notes_list.select_next(silent=False))
-        self.search_entry.bind("<Control-j>", lambda e: self.notes_list.select_next(silent=False))
-        self.search_entry.bind("<Next>", lambda e: self.notes_list.select_next(silent=False, delta=10))
+        self.search_entry.bind("<Down>", lambda _: self.notes_list.select_next(silent=False))
+        self.search_entry.bind("<Control-j>", lambda _: self.notes_list.select_next(silent=False))
+        self.search_entry.bind("<Next>", lambda _: self.notes_list.select_next(silent=False, delta=10))
 
         self.text_note.bind("<<Change>>", self.handler_text_change)
 
         # user presses escape in text area, they go back to search box
-        self.text_note.bind("<Escape>", lambda e: self.search_entry.focus())
-        self.text_note.bind("<Control-bracketleft>", lambda e: self.search_entry.focus())
-        # <Key>
+        self.text_note.bind("<Escape>", lambda _: self.search_entry.focus())
+        self.text_note.bind("<Control-bracketleft>", lambda _: self.search_entry.focus())
 
         self.text_note.bind("<Control-BackSpace>", self.handler_control_backspace)
         self.text_note.bind("<Control-Delete>", self.handler_control_delete)
@@ -1284,12 +1283,12 @@ class View(utils.SubjectMixin):
         edit_menu.add_command(
             label="Undo", accelerator="Ctrl+Z", underline=0, command=lambda: self.text_note.edit_undo()
         )
-        self.root.bind_all("<Control-z>", lambda e: self.text_note.edit_undo())
+        self.root.bind_all("<Control-z>", lambda _: self.text_note.edit_undo())
 
         edit_menu.add_command(
             label="Redo", accelerator="Ctrl+Y", underline=0, command=lambda: self.text_note.edit_redo()
         )
-        self.root.bind_all("<Control-y>", lambda e: self.text_note.edit_redo())
+        self.root.bind_all("<Control-y>", lambda _: self.text_note.edit_redo())
 
         edit_menu.add_separator()
 
@@ -1913,8 +1912,8 @@ class View(utils.SubjectMixin):
             )
 
             # Hovering over link changes cursor to hand
-            t.tag_bind(tag, "<Enter>", lambda e: t.config(cursor="hand2"))
-            t.tag_bind(tag, "<Leave>", lambda e: t.config(cursor=""))
+            t.tag_bind(tag, "<Enter>", lambda _: t.config(cursor="hand2"))
+            t.tag_bind(tag, "<Leave>", lambda _: t.config(cursor=""))
 
             # Clicking link calls link handler method
             t.tag_bind(tag, "<Button-1>", lambda e, link=link: self.handler_click_link(link))

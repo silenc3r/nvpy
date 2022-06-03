@@ -852,7 +852,7 @@ class NotesDB(utils.SubjectMixin):
                 try:
                     self.helper_save_note(o.key, o.note)
 
-                except WriteError as e:
+                except WriteError:
                     logging.error("FATAL ERROR in access to file system")
                     print("FATAL ERROR: Check the nvpy.log")
                     os._exit(1)
